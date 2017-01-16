@@ -1,0 +1,7 @@
+[package]
+name = "apifuzz"
+version = "0.1.0"
+authors = ["Tom Fogal <tfogal@sci.utah.edu>"]
+
+[dependencies]
+rand = "0.3"

@@ -1,0 +1,138 @@
+mod bitvector;
+mod bloom;
+use std::fmt::Write;
+extern crate rand;
+use rand::Rng;
+
+#[derive(PartialEq)]
+#[allow(dead_code)]
+enum Type {
+	U8, I8, U16, I16, U32, I32, U64, I64, F32, F64,
+	USIZE, INTEGER, UNSIGNED,
+	UDT(String, Box<Type>),
+	Pointer(Box<Type>),
+	/* Nil is a sentinel to end recursion, specifically for UDTs.  For example,
+	 * "struct ty;" is an opaque type, so its typelist is just 'Nil'. */
+	Nil,
+}
+trait Name {
+	fn name(&self) -> String;
+}
+
+macro_rules! tryp {
+	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
+}
+
+impl Name for Type {
+	fn name(&self) -> String {
+		use Type::*;
+		let mut res = String::new();
+		match self {
+			&U8 => "uint8_t",
+			&I8 => "int8_t",
+			&U16 => "uint16_t", &I16 => "int16_t",
+			&U32 => "uint32_t", &I32 => "int32_t",
+			&U64 => "uint64_t", &I64 => "int64_t",
+			&F32 => "float", &F64 => "double",
+			&USIZE => "size_t", &INTEGER => "int", &UNSIGNED => "unsigned",
+			&Type::UDT(ref udt, _) => udt,
+			&Type::Pointer(ref t) => {
+				tryp!(write!(&mut res, "{}*", t.name()));
+				res.as_str().clone()
+			},
+			&Nil => "bug; type is nil!"
+		}.to_string()
+	}
+}
+
+struct Function {
+	return_type: Type,
+	arguments: Vec<Type>,
+	name: String,
+}
+struct ValueU64 {
+	tested: bloom::Bloom,
+	rng: rand::ThreadRng,
+	distr: rand::distributions::Range<u64>,
+}
+impl ValueU64 {
+	pub fn new() -> Self {
+		ValueU64 {
+			tested: bloom::Bloom::new(),
+			rng: rand::thread_rng(),
+			distr: rand::distributions::Range::new(u64::min_value(), u64::max_value()),
+		}
+	}
+	pub fn get(&mut self) -> u64 {
+		use rand::distributions::IndependentSample;
+		return self.distr.ind_sample(&mut self.rng);
+	}
+}
+
+fn prototypes(strm: &mut std::io::Write, functions: &Vec<Function>) {
+	for fqn in functions.iter() {
+		tryp!(write!(strm, "extern {} {}(", fqn.return_type.name(), fqn.name));
+		for a in 0..fqn.arguments.len() {
+			tryp!(write!(strm, "{}", fqn.arguments[a].name()));
+			if a != fqn.arguments.len()-1 {
+				tryp!(write!(strm, ", "));
+			}
+		}
+		tryp!(writeln!(strm, ");"));
+	}
+}
+
+fn generate(functions: &Vec<Function>, v64: &mut ValueU64) {
+	println!("#include <stdio.h>");
+	println!("#include <stdlib.h>");
+	println!("#include <search.h>\n");
+	prototypes(&mut std::io::stdout(), functions);
+	println!("\nint main() {{");
+
+	// produce variable declarations of the form '<Type> vYY = 0;'.
+	let mut i: usize = 0;
+	for fqn in functions.iter() {
+		for a in 0..fqn.arguments.len() {
+			let value = v64.get();
+			// if it's a pointer, deref once to create the correct kind of thing.
+			// then when we pass it, we'll pass "&it" instead of just "it".
+			match &fqn.arguments[a] {
+				&Type::Pointer(ref t) => {
+					println!("\t{} v{}{};", t.name(), a, i);
+				},
+				ref t => println!("\t{} v{}{} = {};", t.name(), a, i, value),
+			};
+		}
+		i += 1;
+	}
+
+	/* produce "x = f(...);" lines. */
+	for f in 0..functions.len() {
+		print!("\t{} frv{} = {}(", functions[f].return_type.name(),
+		       f, functions[f].name);
+		for a in 0..functions[f].arguments.len() {
+			match &functions[f].arguments[a] {
+				&Type::Pointer(ref _t) => print!("&v{}{}", a, f),
+				ref _t => print!("v{}{}", a, f),
+			};
+			//print!("v{}{}", a, f);
+			if a != functions[f].arguments.len()-1 {
+				print!(", ");
+			}
+		}
+		println!(");");
+	}
+	println!("\treturn EXIT_SUCCESS;");
+	println!("}}");
+}
+
+fn main() {
+	let hs_data = Type::UDT("struct hsearch_data".to_string(), Box::new(Type::Nil));
+	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data));
+	let hcreate_r_args = vec![Type::USIZE, hs_data_ptr];
+	let hcreate_r  = Function { return_type: Type::INTEGER,
+	                            arguments: hcreate_r_args,
+	                            name: "hcreate_r".to_string() };
+	let mut used = ValueU64::new();
+	generate(&vec![hcreate_r], &mut used);
+}
