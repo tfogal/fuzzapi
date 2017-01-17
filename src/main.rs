@@ -1,8 +1,9 @@
-mod bitvector;
-mod bloom;
 use std::fmt::Write;
+use std::fs::File;
 extern crate rand;
 use rand::Rng;
+mod bitvector;
+mod bloom;
 
 #[derive(PartialEq)]
 #[allow(dead_code)]
@@ -82,12 +83,13 @@ fn prototypes(strm: &mut std::io::Write, functions: &Vec<Function>) {
 	}
 }
 
-fn generate(functions: &Vec<Function>, v64: &mut ValueU64) {
-	println!("#include <stdio.h>");
-	println!("#include <stdlib.h>");
-	println!("#include <search.h>\n");
-	prototypes(&mut std::io::stdout(), functions);
-	println!("\nint main() {{");
+fn generate(mut strm: &mut std::io::Write, functions: &Vec<Function>,
+            v64: &mut ValueU64) {
+	tryp!(writeln!(strm, "#include <stdio.h>"));
+	tryp!(writeln!(strm, "#include <stdlib.h>"));
+	tryp!(writeln!(strm, "#include <search.h>\n"));
+	prototypes(&mut strm, functions);
+	tryp!(writeln!(strm, "\nint main() {{"));
 
 	// produce variable declarations of the form '<Type> vYY = 0;'.
 	let mut i: usize = 0;
@@ -98,9 +100,11 @@ fn generate(functions: &Vec<Function>, v64: &mut ValueU64) {
 			// then when we pass it, we'll pass "&it" instead of just "it".
 			match &fqn.arguments[a] {
 				&Type::Pointer(ref t) => {
-					println!("\t{} v{}{};", t.name(), a, i);
+					tryp!(writeln!(strm, "\t{} v{}{};", t.name(), a, i));
 				},
-				ref t => println!("\t{} v{}{} = {};", t.name(), a, i, value),
+				ref t => {
+					tryp!(writeln!(strm, "\t{} v{}{} = {};", t.name(), a, i, value));
+				},
 			};
 		}
 		i += 1;
@@ -108,22 +112,21 @@ fn generate(functions: &Vec<Function>, v64: &mut ValueU64) {
 
 	/* produce "x = f(...);" lines. */
 	for f in 0..functions.len() {
-		print!("\t{} frv{} = {}(", functions[f].return_type.name(),
-		       f, functions[f].name);
+		tryp!(write!(strm, "\t{} frv{} = {}(", functions[f].return_type.name(),
+		             f, functions[f].name));
 		for a in 0..functions[f].arguments.len() {
 			match &functions[f].arguments[a] {
-				&Type::Pointer(ref _t) => print!("&v{}{}", a, f),
-				ref _t => print!("v{}{}", a, f),
+				&Type::Pointer(ref _t) => tryp!(write!(strm, "&v{}{}", a, f)),
+				ref _t => tryp!(write!(strm, "v{}{}", a, f)),
 			};
-			//print!("v{}{}", a, f);
 			if a != functions[f].arguments.len()-1 {
-				print!(", ");
+				tryp!(write!(strm, ", "));
 			}
 		}
-		println!(");");
+		tryp!(writeln!(strm, ");"));
 	}
-	println!("\treturn EXIT_SUCCESS;");
-	println!("}}");
+	tryp!(writeln!(strm, "\treturn EXIT_SUCCESS;"));
+	tryp!(writeln!(strm, "}}"));
 }
 
 fn main() {
@@ -133,6 +136,14 @@ fn main() {
 	let hcreate_r  = Function { return_type: Type::INTEGER,
 	                            arguments: hcreate_r_args,
 	                            name: "hcreate_r".to_string() };
+	let fname: &'static str = "/tmp/fuzzapi.c";
+	let mut f = match File::create(fname) {
+		Err(e) => {
+			println!("Could not create {}: {}", fname, e);  /* FIXME stderr */
+			std::process::exit(1);
+		},
+		Ok(x) => x,
+	};
 	let mut used = ValueU64::new();
-	generate(&vec![hcreate_r], &mut used);
+	generate(&mut f, &vec![hcreate_r], &mut used);
 }
