@@ -1,4 +1,3 @@
-//mod bitvector;
 use bitvector::*;
 
 pub struct Bloom {
@@ -11,7 +10,8 @@ fn hash1(x: u64) -> u16 {
 	return (x % 65535) as u16;
 }
 fn hash2(x: u64) -> u16 {
-	return (((x >> 24) * (x >> 24) + (x >> 12) + (x >> 6)) % 65535) as u16;
+	let t = ((x >> 24).wrapping_mul(x >> 24) + (x >> 12) + (x >> 6)) % 65535;
+	return t as u16;
 }
 fn hash3(x: u64) -> u16 {
 	return ((x ^ 0xacccf956a9410cab) % 65535) as u16;
