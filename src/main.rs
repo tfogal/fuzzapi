@@ -66,7 +66,12 @@ impl ValueU64 {
 	}
 	pub fn get(&mut self) -> u64 {
 		use rand::distributions::IndependentSample;
-		return self.distr.ind_sample(&mut self.rng);
+		let mut sample = self.distr.ind_sample(&mut self.rng);
+		while self.tested.query(sample) {
+			sample = self.distr.ind_sample(&mut self.rng);
+		}
+		self.tested.add(sample);
+		return sample;
 	}
 }
 
