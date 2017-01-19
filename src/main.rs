@@ -1,5 +1,6 @@
 use std::fmt::Write;
 use std::fs::File;
+use std::process::Command;
 extern crate rand;
 use rand::Rng;
 mod bitvector;
@@ -151,4 +152,19 @@ fn main() {
 	};
 	let mut used = ValueU64::new();
 	generate(&mut f, &vec![hcreate_r], &mut used);
+	let outname: &'static str = ".fuzziter";
+	let output = Command::new("gcc").arg("-Wall").arg("-Wextra")
+	                                .arg("-fcheck-pointer-bounds")
+	                                .arg("-mmpx")
+	                                .arg("-D_GNU_SOURCE").arg("-o")
+	                                .arg(outname).arg(fname).output();
+	let output = match output {
+		Err(e) => {
+			println!("compilation failed: {}", e); /* FIXME stderr */
+			panic!("");
+		},
+		Ok(x) => x,
+	};
+	let outs: String = String::from_utf8(output.stdout).unwrap();
+	println!("gcc output: '{}'", outs);
 }
