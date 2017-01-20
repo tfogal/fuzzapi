@@ -6,23 +6,26 @@ pub struct Bloom {
 	hashes: [fn(u64) -> u16; 4],
 }
 
+static MAX_BITS: u64 = 65535;
+
 fn hash1(x: u64) -> u16 {
-	return (x % 65535) as u16;
+	return (x % MAX_BITS) as u16;
 }
 fn hash2(x: u64) -> u16 {
-	let t = ((x >> 24).wrapping_mul(x >> 24) + (x >> 12) + (x >> 6)) % 65535;
+	let t = ((x >> 24).wrapping_mul(x >> 24) + (x >> 12) + (x >> 6)) % MAX_BITS;
 	return t as u16;
 }
 fn hash3(x: u64) -> u16 {
-	return ((x ^ 0xacccf956a9410cab) % 65535) as u16;
+	return ((x ^ 0xacccf956a9410cab) % MAX_BITS) as u16;
 }
 fn hash4(x: u64) -> u16 {
-	return ((x ^ 0x137ab591abdfca56) % 65535) as u16;
+	return ((x ^ 0x137ab591abdfca56) % MAX_BITS) as u16;
 }
 
 impl Bloom {
 	pub fn new() -> Self {
-		Bloom { bv: BitVector::new(65535), hashes: [hash1, hash2, hash3, hash4] }
+		Bloom { bv: BitVector::new(MAX_BITS as usize),
+		        hashes: [hash1, hash2, hash3, hash4] }
 	}
 
 	pub fn add(&mut self, v: u64) {
@@ -55,7 +58,7 @@ mod test {
 	#[test]
 	fn blnone() {
 		let bl = Bloom::new();
-		for i in 0..65535 {
+		for i in 0..MAX_BITS {
 			assert_eq!(bl.query(i), false);
 		}
 	}
