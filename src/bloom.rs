@@ -42,6 +42,16 @@ impl Bloom {
 		}
 		return true;
 	}
+
+	// checks if all values have been set.
+	pub fn complete(&self) -> bool {
+		for b in 0..MAX_BITS {
+			if !self.bv.query(b) {
+				return false;
+			}
+		}
+		return true;
+	}
 }
 
 #[cfg(test)]
