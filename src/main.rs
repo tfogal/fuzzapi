@@ -2,7 +2,6 @@ use std::fmt::Write;
 use std::fs::File;
 use std::process::Command;
 extern crate rand;
-use rand::Rng;
 mod bitvector;
 mod bloom;
 
