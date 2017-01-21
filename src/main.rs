@@ -153,18 +153,33 @@ fn main() {
 	let mut used = ValueU64::new();
 	generate(&mut f, &vec![hcreate_r], &mut used);
 	let outname: &'static str = ".fuzziter";
-	let output = Command::new("gcc").arg("-Wall").arg("-Wextra")
-	                                .arg("-fcheck-pointer-bounds")
-	                                .arg("-mmpx")
-	                                .arg("-D_GNU_SOURCE").arg("-o")
-	                                .arg(outname).arg(fname).output();
-	let output = match output {
+	let compile = match Command::new("gcc").arg("-Wall").arg("-Wextra")
+	                                       .arg("-fcheck-pointer-bounds")
+	                                       .arg("-mmpx")
+	                                       .arg("-D_GNU_SOURCE").arg("-o")
+	                                       .arg(outname).arg(fname).output() {
 		Err(e) => {
 			println!("compilation failed: {}", e); /* FIXME stderr */
 			panic!("");
 		},
 		Ok(x) => x,
 	};
-	let outs: String = String::from_utf8(output.stdout).unwrap();
-	println!("gcc output: '{}'", outs);
+	let comps: String = String::from_utf8(compile.stdout).unwrap();
+	if comps.len() > 0 {
+		println!("gcc output: '{}'", comps);
+	}
+
+	let cmdname: String = String::from("./") + String::from(outname).as_str();
+	let run = match Command::new(cmdname).output() {
+		Err(e) => {
+			println!("Program error: {}", e); // FIXME stderr
+			// cat .fuzziter ...
+			panic!("Might have found a bug, bailing ...");
+		},
+		Ok(x) => x,
+	};
+	let runout: String = String::from_utf8(run.stdout).unwrap();
+	if runout.len() > 0 {
+		println!("program output: '{}'", runout);
+	}
 }
