@@ -15,6 +15,7 @@ impl BitVector {
 		self.bits[byte as usize] |= bit;
 	}
 
+	#[allow(dead_code)]
 	pub fn clear(&mut self, n: u64) {
 		let byte = n / 8;
 		let bit = 1u8 << ((n % 8) as u8);
