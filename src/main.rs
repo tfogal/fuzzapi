@@ -192,8 +192,6 @@ fn generate(mut strm: &mut std::io::Write, functions: &Vec<&Function>,
 	tryp!(writeln!(strm, "}}"));
 }
 
-
-
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
@@ -244,8 +242,20 @@ fn main() {
 		dest: VariableUse::Nil,
 		ty: &hsrch.arguments[2],
 	};
-
-
+	// next:
+	// 1) generate a "state vector", which is the cartesian product of all states
+	//    of all 'tested' values for all FreeVariables
+	// 2) generalize the 'generate' function so that it takes the state vector
+	//    and uses it to generate a unique program that tests that particular
+	//    state
+	// 3) write something that lets you iterate through state vectors, i.e. a
+	//    function that takes a state vector and returns the "next" state vector.
+	// 4) rewrite the bloom filter stuff for FreeVariable::tested.  What you
+	//    really want is just to divide the potential value space of each type
+	//    into a set of distinct classes.  The number of states for that variable
+	//    is the number of classes defined on that type.
+	// => Similarly, you really need a whole set of types instead of trying to
+	//    force 'ValueU64' on everything.
 
 
 	let fname: &'static str = "/tmp/fuzzapi.c";
