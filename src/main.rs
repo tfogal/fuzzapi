@@ -5,6 +5,8 @@ use std::process::Command;
 extern crate rand;
 mod bitvector;
 mod bloom;
+mod tc;
+use bitvector::*;
 
 #[derive(Clone, PartialEq)]
 #[allow(dead_code)]
@@ -67,6 +69,26 @@ struct Function {
 	arguments: Arguments,
 	name: String,
 }
+struct ValueU8 {
+	tested: BitVector,
+	cls: tc::TC_U8,
+}
+struct ValueI32 {
+	tested: BitVector,
+	cls: tc::TC_I32,
+}
+impl ValueI32 {
+	fn new() -> Self {
+		use tc::TypeClass;
+		let c = tc::TC_I32::new();
+		let bv = BitVector::new(c.n());
+		ValueI32 {
+			tested: bv,
+			cls: c,
+		}
+	}
+}
+
 struct ValueU64 {
 	tested: bloom::Bloom,
 	rng: rand::ThreadRng,
@@ -129,6 +151,13 @@ struct DependentVariable<'a> {
 struct FreeVariable<'a> {
 	name: String,
 	tested: ValueU64, // probably want to parametrize
+	dest: VariableUse<'a>,
+	ty: &'a Type,
+}
+
+struct FreeVariableI32<'a> {
+	name: String,
+	tested: ValueI32,
 	dest: VariableUse<'a>,
 	ty: &'a Type,
 }
@@ -236,9 +265,9 @@ fn main() {
 	};
 	// return type, but it actually comes from an argument...
 	//let arg_rtype = Type::Pointer(Box::new(Type::Pointer(Box::new(entry))));
-	let rv = FreeVariable {
+	let rv = FreeVariableI32 {
 		name: "retval".to_string(),
-		tested: ValueU64::new(),
+		tested: ValueI32::new(),
 		dest: VariableUse::Nil,
 		ty: &hsrch.arguments[2],
 	};
