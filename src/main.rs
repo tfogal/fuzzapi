@@ -5,33 +5,25 @@ use std::process::Command;
 extern crate rand;
 mod bitvector;
 mod bloom;
+mod function;
 mod tc;
+mod typ;
+mod variable;
 use bitvector::*;
-
-#[derive(Clone, PartialEq)]
-#[allow(dead_code)]
-enum Type {
-	U8, I8, U16, I16, U32, I32, U64, I64, F32, F64,
-	Usize, Integer, Unsigned,
-	Character,
-	Void,
-	Enum(String, BTreeMap<String, u32>), // name + set of values
-	// Each Type in the vec is assumed to be a Field.
-	UDT(String, Vec<Box<Type>>),
-	Field(String, Box<Type>),
-	Pointer(Box<Type>),
-}
-trait Name {
-	fn name(&self) -> String;
-}
+use function::*;
+use typ::*;
 
 macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
 
+trait Name {
+	fn name(&self) -> String;
+}
+
 impl Name for Type {
 	fn name<'a>(&'a self) -> String {
-		use Type::*;
+		use typ::Type::*;
 		let mut res = String::new();
 		match self {
 			&U8 => "uint8_t",
@@ -60,15 +52,6 @@ impl Name for Type {
 	}
 }
 
-type Arguments = Vec<Type>;
-type ReturnType = Type;
-
-#[derive(Clone)]
-struct Function {
-	return_type: Type,
-	arguments: Arguments,
-	name: String,
-}
 struct ValueU8 {
 	tested: BitVector,
 	cls: tc::TC_U8,
@@ -119,17 +102,6 @@ impl ValueU64 {
 	}
 }
 
-enum VariableSource<'a> {
-	Free,
-	Parameter(&'a Function, usize), // function + parameter index it comes from
-	ReturnValue(&'a Function),
-}
-
-enum VariableUse<'a> {
-	Nil, // isn't used.
-	Argument(&'a Function, usize), // function + parameter index it comes from
-}
-
 // A dependent variable is a variable that we don't actually have control over.
 // For example, if the API model states that 'the return value of f() must be
 // the second argument of g()', a la:
@@ -140,25 +112,25 @@ enum VariableUse<'a> {
 #[allow(dead_code)]
 struct DependentVariable<'a> {
 	name: String,
-	src: VariableSource<'a>,
-	dest: VariableUse<'a>,
+	src: variable::Source<'a>,
+	dest: variable::Use<'a>,
 	// do we need a type: Type ?
 }
 
 // A free variable is a variable that we DO have control over.  This generally
 // means variables that are API inputs.
 #[allow(dead_code)]
-struct FreeVariable<'a> {
+struct FreeVariableU64<'a> {
 	name: String,
 	tested: ValueU64, // probably want to parametrize
-	dest: VariableUse<'a>,
+	dest: variable::Use<'a>,
 	ty: &'a Type,
 }
 
 struct FreeVariableI32<'a> {
 	name: String,
 	tested: ValueI32,
-	dest: VariableUse<'a>,
+	dest: variable::Use<'a>,
 	ty: &'a Type,
 }
 
@@ -248,19 +220,19 @@ fn main() {
 	// "argument 1 of hcreate_r must be argument 3 of hsearch_r"
 	let tbl = DependentVariable {
 		name: "tbl".to_string(),
-		src: VariableSource::Parameter(&hcreate_r, 1),
-		dest: VariableUse::Argument(&hsrch, 3)
+		src: variable::Source::Parameter(&hcreate_r, 1),
+		dest: variable::Use::Argument(&hsrch, 3)
 	};
-	let srch_entry = FreeVariable {
+	let srch_entry = FreeVariableU64 {
 		name: "item".to_string(),
 		tested: ValueU64::new(),
-		dest: VariableUse::Argument(&hsrch, 0),
+		dest: variable::Use::Argument(&hsrch, 0),
 		ty: &hsrch.arguments[0],
 	};
-	let srch_action = FreeVariable {
+	let srch_action = FreeVariableU64 {
 		name: "action".to_string(),
 		tested: ValueU64::new(),
-		dest: VariableUse::Argument(&hsrch, 1),
+		dest: variable::Use::Argument(&hsrch, 1),
 		ty: &hsrch.arguments[1]
 	};
 	// return type, but it actually comes from an argument...
@@ -268,7 +240,7 @@ fn main() {
 	let rv = FreeVariableI32 {
 		name: "retval".to_string(),
 		tested: ValueI32::new(),
-		dest: VariableUse::Nil,
+		dest: variable::Use::Nil,
 		ty: &hsrch.arguments[2],
 	};
 	// next:
