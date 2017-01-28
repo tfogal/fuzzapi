@@ -134,6 +134,17 @@ struct FreeVariableI32<'a> {
 	ty: &'a Type,
 }
 
+impl<'a> variable::Free for FreeVariableI32<'a> {
+	fn name(&self) -> String { return self.name.clone(); }
+	fn n_state(&self) -> usize {
+		use tc::TypeClass;
+		return self.tested.cls.n();
+	}
+	fn next(&mut self) {
+		/* do nothing for now ... */
+	}
+}
+
 fn prototypes(strm: &mut std::io::Write, functions: &Vec<&Function>) {
 	for fqn in functions.iter() {
 		tryp!(write!(strm, "extern {} {}(", fqn.return_type.name(), fqn.name));
