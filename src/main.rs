@@ -234,15 +234,16 @@ fn main() {
 		src: variable::Source::Parameter(&hcreate_r, 1),
 		dest: variable::Use::Argument(&hsrch, 3)
 	};
+	use variable::Value;
 	let srch_entry = FreeVariableU64 {
 		name: "item".to_string(),
 		tested: ValueU64::new(),
 		dest: variable::Use::Argument(&hsrch, 0),
 		ty: &hsrch.arguments[0],
 	};
-	let srch_action = FreeVariableU64 {
+	let srch_action = variable::FreeEnum {
 		name: "action".to_string(),
-		tested: ValueU64::new(),
+		tested: variable::ValueEnum::new(&hsrch.arguments[0]),
 		dest: variable::Use::Argument(&hsrch, 1),
 		ty: &hsrch.arguments[1]
 	};
