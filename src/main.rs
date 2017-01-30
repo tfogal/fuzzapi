@@ -243,7 +243,7 @@ fn main() {
 	};
 	let srch_action = variable::FreeEnum {
 		name: "action".to_string(),
-		tested: variable::ValueEnum::new(&hsrch.arguments[0]),
+		tested: variable::ValueEnum::new(&hsrch.arguments[1]),
 		dest: variable::Use::Argument(&hsrch, 1),
 		ty: &hsrch.arguments[1]
 	};
