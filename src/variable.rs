@@ -24,19 +24,20 @@ pub enum Use<'a> {
 // Free is a container for all of the variable information.
 pub trait Free {
 	fn name(&self) -> String;
-	// The number of states this has.
-	fn n_state(&self) -> usize;
-	// Apply the next state.
-	fn next(&mut self);
 }
 
 // A Value holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in the list.
 pub trait Value<'a, T> {
 	fn new(&'a Type) -> Self;
-	fn get(&mut self) -> T;
+	// Grabs the current state.
+	fn get(&self) -> T;
+	// Moves to the next state.
+	fn next(&mut self);
 	fn n_state(&self) -> usize;
 }
+
+//---------------------------------------------------------------------
 
 pub struct ValueEnum<'a> {
 	ty: &'a Type,
@@ -48,13 +49,40 @@ impl<'a> Value<'a, i32> for ValueEnum<'a> {
 	fn new(t: &'a Type) -> Self {
 		ValueEnum{ty: t, cls: TC_Enum::new(t), idx: 0}
 	}
-	fn get(&mut self) -> i32 {
-		let rv = self.idx;
+
+	fn get(&self) -> i32 {
+		return self.cls.value(self.idx);
+	}
+	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
 			self.idx = self.idx + 1;
 		}
-		return self.cls.value(rv);
 	}
+
+	fn n_state(&self) -> usize {
+		return self.cls.n();
+	}
+}
+
+pub struct ValueI32 {
+	cls: TC_I32,
+	idx: usize,
+}
+
+impl<'a> Value<'a, i32> for ValueI32 {
+	fn new(_: &'a Type) -> Self {
+		ValueI32{ cls: TC_I32::new(), idx: 0 }
+	}
+
+	fn get(&self) -> i32 {
+		return self.cls.value(self.idx);
+	}
+	fn next(&mut self) {
+		if self.idx < self.cls.n()-1 {
+			self.idx = self.idx + 1
+		}
+	}
+
 	fn n_state(&self) -> usize {
 		return self.cls.n();
 	}
@@ -69,11 +97,15 @@ pub struct FreeEnum<'a> {
 
 impl<'a> Free for FreeEnum<'a> {
 	fn name(&self) -> String { return self.name.clone(); }
-	fn n_state(&self) -> usize {
-		use tc::TypeClass;
-		return self.tested.cls.n();
-	}
-	fn next(&mut self) {
-		/* unimplemented right now ... */
-	}
+}
+
+pub struct FreeI32<'a> {
+	pub name: String,
+	pub tested: ValueI32,
+	pub dest: Use<'a>,
+	pub ty: &'a Type,
+}
+
+impl<'a> Free for FreeI32<'a> {
+	fn name(&self) -> String { return self.name.clone(); }
 }

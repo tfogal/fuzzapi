@@ -52,26 +52,13 @@ impl Name for Type {
 	}
 }
 
+/* todo move this to variable.rs */
 struct ValueU8 {
 	tested: BitVector,
 	cls: tc::TC_U8,
 }
-struct ValueI32 {
-	tested: BitVector,
-	cls: tc::TC_I32,
-}
-impl ValueI32 {
-	fn new() -> Self {
-		use tc::TypeClass;
-		let c = tc::TC_I32::new();
-		let bv = BitVector::new(c.n());
-		ValueI32 {
-			tested: bv,
-			cls: c,
-		}
-	}
-}
 
+/* todo this is outdated and broken */
 struct ValueU64 {
 	tested: bloom::Bloom,
 	rng: rand::ThreadRng,
@@ -120,29 +107,12 @@ struct DependentVariable<'a> {
 // A free variable is a variable that we DO have control over.  This generally
 // means variables that are API inputs.
 #[allow(dead_code)]
+// todo this is broken, but the idea of a u64 free var should be in variable.rs
 struct FreeVariableU64<'a> {
 	name: String,
 	tested: ValueU64, // probably want to parametrize
 	dest: variable::Use<'a>,
 	ty: &'a Type,
-}
-
-struct FreeVariableI32<'a> {
-	name: String,
-	tested: ValueI32,
-	dest: variable::Use<'a>,
-	ty: &'a Type,
-}
-
-impl<'a> variable::Free for FreeVariableI32<'a> {
-	fn name(&self) -> String { return self.name.clone(); }
-	fn n_state(&self) -> usize {
-		use tc::TypeClass;
-		return self.tested.cls.n();
-	}
-	fn next(&mut self) {
-		/* do nothing for now ... */
-	}
 }
 
 fn prototypes(strm: &mut std::io::Write, functions: &Vec<&Function>) {
@@ -204,6 +174,13 @@ fn generate(mut strm: &mut std::io::Write, functions: &Vec<&Function>,
 	tryp!(writeln!(strm, "}}"));
 }
 
+// An API is a collection of Functions, DependentVariables, and FreeVariables.
+struct API<'a> {
+	fqn: Vec<Function>,
+	free: Vec<Box<variable::Free>>,
+	dep: Vec<Box<DependentVariable<'a>>>,
+}
+
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
@@ -228,33 +205,45 @@ fn main() {
 	];
 	let hsrch = Function { return_type: Type::Integer, arguments: hs_args,
 	                       name: "hsearch_r".to_string() };
-	// "argument 1 of hcreate_r must be argument 3 of hsearch_r"
-	let tbl = DependentVariable {
-		name: "tbl".to_string(),
-		src: variable::Source::Parameter(&hcreate_r, 1),
-		dest: variable::Use::Argument(&hsrch, 3)
-	};
+
 	use variable::Value;
-	let srch_entry = FreeVariableU64 {
-		name: "item".to_string(),
-		tested: ValueU64::new(),
-		dest: variable::Use::Argument(&hsrch, 0),
-		ty: &hsrch.arguments[0],
-	};
-	let srch_action = variable::FreeEnum {
-		name: "action".to_string(),
-		tested: variable::ValueEnum::new(&hsrch.arguments[1]),
-		dest: variable::Use::Argument(&hsrch, 1),
-		ty: &hsrch.arguments[1]
-	};
-	// return type, but it actually comes from an argument...
-	//let arg_rtype = Type::Pointer(Box::new(Type::Pointer(Box::new(entry))));
-	let rv = FreeVariableI32 {
-		name: "retval".to_string(),
-		tested: ValueI32::new(),
-		dest: variable::Use::Nil,
-		ty: &hsrch.arguments[2],
-	};
+
+	{
+		let fqns: Vec<Function> = vec![hcreate_r.clone(), hsrch.clone()];
+		let mut depvar: Vec<Box<DependentVariable>> = Vec::new();
+		let mut freevar: Vec<Box<variable::Free>> = Vec::new();
+		depvar.push(Box::new(DependentVariable{
+			name: "tbl".to_string(),
+			src: variable::Source::Parameter(&fqns[0], 1),
+			dest: variable::Use::Argument(&fqns[1], 3),
+		}));
+		// todo / fixme: need to add a free var for arg0, "ENTRY item".
+/*
+		freevar.push(Box::new(variable::FreeUDT {
+			...
+			name: "item".to_string(),
+			tested: variable::ValueUDT::new(),
+			dest: variable::Use::Argument(&hsrch, 0),
+			ty: &hsrch.arguments[0],
+		}));
+*/
+		freevar.push(Box::new(variable::FreeEnum {
+			name: "action".to_string(),
+			tested: variable::ValueEnum::new(&fqns[1].arguments[1]),
+			dest: variable::Use::Argument(&fqns[1], 1),
+			ty: &fqns[1].arguments[1],
+		}));
+		// return type, but it actually comes from an argument...
+		freevar.push(Box::new(variable::FreeI32 {
+			name: "retval".to_string(),
+			tested: variable::ValueI32::new(&hsrch.arguments[2]),
+			dest: variable::Use::Nil,
+			ty: &hsrch.arguments[2],
+		}));
+		// todo / fixme: add a method that takes an API and generates the "next"
+		// program.
+	}
+
 	// next:
 	// 1) generate a "state vector", which is the cartesian product of all states
 	//    of all 'tested' values for all FreeVariables
