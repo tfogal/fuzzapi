@@ -1,6 +1,7 @@
 use std::collections::btree_map::BTreeMap;
 
-#[derive(Clone, PartialEq)]
+// A Type holds the basic immutable type information of the object.
+#[derive(Clone, Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum Type {
 	U8, I8, U16, I16, U32, I32, U64, I64, F32, F64,
