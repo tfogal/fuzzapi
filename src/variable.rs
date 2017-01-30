@@ -24,10 +24,19 @@ pub enum Use<'a> {
 // Free is a container for all of the variable information.
 pub trait Free {
 	fn name(&self) -> String;
+	// Generate a C expression that could be used in initializing a value of this
+	// variable.
+	fn value(&self) -> String;
 }
 
 // A Value holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in the list.
+// todo: rewrite this to not have a template parameter.  Instead of 'get'
+// returning a type T, have it just return a string with the
+// appropriately-typed value stringified.  The idea is we could write:
+//   writeln!(value.type_name() + " v00 = " + value.get());
+// or similar.  Importantly, this gets around the issue of recursive types
+// (user-defined types).
 pub trait Value<'a, T> {
 	fn new(&'a Type) -> Self;
 	// Grabs the current state.
@@ -97,6 +106,12 @@ pub struct FreeEnum<'a> {
 
 impl<'a> Free for FreeEnum<'a> {
 	fn name(&self) -> String { return self.name.clone(); }
+	fn value(&self) -> String {
+		use std::fmt::Write;
+		let mut res = String::new();
+		write!(&mut res, "{}", self.tested.get()).unwrap();
+		return res;
+	}
 }
 
 pub struct FreeI32<'a> {
@@ -108,4 +123,10 @@ pub struct FreeI32<'a> {
 
 impl<'a> Free for FreeI32<'a> {
 	fn name(&self) -> String { return self.name.clone(); }
+	fn value(&self) -> String {
+		use std::fmt::Write;
+		let mut res = String::new();
+		write!(&mut res, "{}", self.tested.get()).unwrap();
+		return res;
+	}
 }
