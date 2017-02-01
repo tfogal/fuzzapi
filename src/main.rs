@@ -9,7 +9,6 @@ mod function;
 mod tc;
 mod typ;
 mod variable;
-use bitvector::*;
 use function::*;
 use typ::*;
 
@@ -50,12 +49,6 @@ impl Name for Type {
 			},
 		}.to_string()
 	}
-}
-
-/* todo move this to variable.rs */
-struct ValueU8 {
-	tested: BitVector,
-	cls: tc::TC_U8,
 }
 
 /* todo this is outdated and broken */
@@ -176,9 +169,9 @@ fn generate(mut strm: &mut std::io::Write, functions: &Vec<&Function>,
 
 // An API is a collection of Functions, DependentVariables, and FreeVariables.
 struct API<'a> {
-	fqn: Vec<Function>,
-	free: Vec<Box<variable::Free>>,
-	dep: Vec<Box<DependentVariable<'a>>>,
+	fqn: &'a Vec<Function>,
+	free: &'a Vec<Box<variable::Free>>,
+	dep: &'a Vec<Box<DependentVariable<'a>>>,
 }
 
 fn main() {
@@ -206,8 +199,6 @@ fn main() {
 	let hsrch = Function { return_type: Type::Integer, arguments: hs_args,
 	                       name: "hsearch_r".to_string() };
 
-	use variable::Value;
-
 	{
 		let fqns: Vec<Function> = vec![hcreate_r.clone(), hsrch.clone()];
 		let mut depvar: Vec<Box<DependentVariable>> = Vec::new();
@@ -220,7 +211,7 @@ fn main() {
 		freevar.push(Box::new(variable::FreeUDT {
 			name: "item".to_string(),
 			tested: variable::ValueUDT::create(&fqns[1].arguments[0]),
-			dest: variable::Use::Argument(&hsrch, 0),
+			dest: variable::Use::Argument(&fqns[1], 0),
 			ty: &hsrch.arguments[0],
 		}));
 		freevar.push(Box::new(variable::FreeEnum {
@@ -234,7 +225,7 @@ fn main() {
 			name: "retval".to_string(),
 			tested: variable::ValueI32::create(&hsrch.arguments[2]),
 			dest: variable::Use::Nil,
-			ty: &hsrch.arguments[2],
+			ty: &fqns[1].arguments[2],
 		}));
 		// todo / fixme: add a method that takes an API and generates the "next"
 		// program.

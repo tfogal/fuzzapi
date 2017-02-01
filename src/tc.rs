@@ -26,7 +26,6 @@
 // find different sets of bugs.
 extern crate rand;
 use std::collections::btree_map::BTreeMap;
-use std::ptr;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
 
@@ -39,11 +38,16 @@ pub trait TypeClass<T> {
 // Specialization is not yet stable in rust.  Thus the types are not type
 // parameters but baked into the type name.  Sigh.
 
+#[allow(non_camel_case_types)]
 pub struct TC_U8 {}
+#[allow(non_camel_case_types)]
 pub struct TC_U16 {}
 /*...*/
+#[allow(non_camel_case_types)]
 pub struct TC_I32 {}
+#[allow(non_camel_case_types)]
 pub struct TC_Pointer {}
+#[allow(non_camel_case_types)]
 pub struct TC_Enum {
 	values: Vec<u32>
 }

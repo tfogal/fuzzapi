@@ -51,14 +51,13 @@ pub fn create(t: &Type) -> Box<Value> {
 //---------------------------------------------------------------------
 
 pub struct ValueEnum {
-	ty: Type,
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
 }
 
 impl ValueEnum {
 	pub fn create(t: &Type) -> Self {
-		ValueEnum{ty: t.clone(), cls: TC_Enum::new(t), idx: 0}
+		ValueEnum{cls: TC_Enum::new(t), idx: 0}
 	}
 }
 
@@ -113,23 +112,23 @@ impl ValueUDT {
 	pub fn create(t: &Type) -> Self {
 		// UDT's 2nd tuple param is a Vec<Box<Type>>, but we want a Vec<Type>.
 		let tys: Vec<Type> = match t {
-			&Type::UDT(ref names, ref types) =>
+			&Type::UDT(_, ref types) =>
 				types.iter().map(|x| (**x).clone()).collect(),
 			_ => panic!("{:?} type given to ValueUDT!", t),
 		};
 		// create an appropriate value for every possible type.
 		let mut val: Vec<Box<Value>> = Vec::new();
-		let mut names: Vec<String> = Vec::new();
 		for x in tys.iter() {
 			let v = create(&x);
 			val.push(v);
 		}
+		let nval: usize = val.len();
 		assert_eq!(tys.len(), val.len());
 		ValueUDT{
 			types: tys,
 			values: val,
 			// we need a vector of 0s the same size as 'values' or 'types'
-			idx: (0..names.len()).map(|_| 0).collect(),
+			idx: (0..nval).map(|_| 0).collect(),
 		}
 	}
 }
@@ -185,7 +184,8 @@ pub struct ValuePointer {
 }
 
 impl ValuePointer {
-	pub fn create(t: &Type) -> Self {
+	pub fn create(_: &Type) -> Self {
+		// doesn't seem to be a good way to assert that t is a &Type::Pointer...
 		ValuePointer{ cls: TC_Pointer::new(), idx: 0 }
 	}
 }
