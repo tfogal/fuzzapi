@@ -43,6 +43,7 @@ pub struct TC_U8 {}
 pub struct TC_U16 {}
 /*...*/
 pub struct TC_I32 {}
+pub struct TC_Pointer {}
 pub struct TC_Enum {
 	values: Vec<u32>
 }
@@ -132,5 +133,25 @@ impl TypeClass<i32> for TC_Enum {
 	fn value(&self, class: usize) -> i32 {
 		assert!(class < self.values.len());
 		return self.values[class] as i32;
+	}
+}
+
+impl TC_Pointer {
+	pub fn new() -> Self {
+		TC_Pointer{}
+	}
+}
+
+// Pointers are pretty simple: null-initialized or not.
+impl TypeClass<usize> for TC_Pointer {
+	fn n(&self) -> usize { 2 }
+	fn value(&self, class: usize) -> usize {
+		let mut rng: rand::ThreadRng = rand::thread_rng();
+		let arb = Range::new(1, usize::max_value()-1);
+		match class {
+			0 => 0,
+			1 => arb.ind_sample(&mut rng),
+			_ => panic!("invalid class {} given for TC_Pointer", class),
+		}
 	}
 }

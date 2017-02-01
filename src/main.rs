@@ -217,26 +217,22 @@ fn main() {
 			src: variable::Source::Parameter(&fqns[0], 1),
 			dest: variable::Use::Argument(&fqns[1], 3),
 		}));
-		// todo / fixme: need to add a free var for arg0, "ENTRY item".
-/*
 		freevar.push(Box::new(variable::FreeUDT {
-			...
 			name: "item".to_string(),
-			tested: variable::ValueUDT::new(),
+			tested: variable::ValueUDT::create(&fqns[1].arguments[0]),
 			dest: variable::Use::Argument(&hsrch, 0),
 			ty: &hsrch.arguments[0],
 		}));
-*/
 		freevar.push(Box::new(variable::FreeEnum {
 			name: "action".to_string(),
-			tested: variable::ValueEnum::new(&fqns[1].arguments[1]),
+			tested: variable::ValueEnum::create(&fqns[1].arguments[1]),
 			dest: variable::Use::Argument(&fqns[1], 1),
 			ty: &fqns[1].arguments[1],
 		}));
 		// return type, but it actually comes from an argument...
 		freevar.push(Box::new(variable::FreeI32 {
 			name: "retval".to_string(),
-			tested: variable::ValueI32::new(&hsrch.arguments[2]),
+			tested: variable::ValueI32::create(&hsrch.arguments[2]),
 			dest: variable::Use::Nil,
 			ty: &hsrch.arguments[2],
 		}));

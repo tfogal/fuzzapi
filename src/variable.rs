@@ -30,37 +30,41 @@ pub trait Free {
 }
 
 // A Value holds TypeClass information and helps us iterate through the
-// class of all values by knowing where we are in the list.
-// todo: rewrite this to not have a template parameter.  Instead of 'get'
-// returning a type T, have it just return a string with the
-// appropriately-typed value stringified.  The idea is we could write:
-//   writeln!(value.type_name() + " v00 = " + value.get());
-// or similar.  Importantly, this gets around the issue of recursive types
-// (user-defined types).
-pub trait Value<'a, T> {
-	fn new(&'a Type) -> Self;
-	// Grabs the current state.
-	fn get(&self) -> T;
-	// Moves to the next state.
+// class of all values by knowing where we are in that sequence.
+pub trait Value {
+	// Grabs the current state as an expression.
+	fn get(&self) -> String;
+	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
 	fn n_state(&self) -> usize;
 }
 
+pub fn create(t: &Type) -> Box<Value> {
+	match t {
+		&Type::Enum(_, _) => Box::new(ValueEnum::create(t)),
+		&Type::I32 => Box::new(ValueI32::create(t)),
+		&Type::Pointer(_) => Box::new(ValuePointer::create(t)),
+		_ => panic!("unimplemented type {:?}", t), // for no valid reason
+	}
+}
+
 //---------------------------------------------------------------------
 
-pub struct ValueEnum<'a> {
-	ty: &'a Type,
+pub struct ValueEnum {
+	ty: Type,
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
 }
 
-impl<'a> Value<'a, i32> for ValueEnum<'a> {
-	fn new(t: &'a Type) -> Self {
-		ValueEnum{ty: t, cls: TC_Enum::new(t), idx: 0}
+impl ValueEnum {
+	pub fn create(t: &Type) -> Self {
+		ValueEnum{ty: t.clone(), cls: TC_Enum::new(t), idx: 0}
 	}
+}
 
-	fn get(&self) -> i32 {
-		return self.cls.value(self.idx);
+impl Value for ValueEnum {
+	fn get(&self) -> String {
+		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
@@ -78,13 +82,15 @@ pub struct ValueI32 {
 	idx: usize,
 }
 
-impl<'a> Value<'a, i32> for ValueI32 {
-	fn new(_: &'a Type) -> Self {
+impl ValueI32 {
+	pub fn create(_: &Type) -> Self {
 		ValueI32{ cls: TC_I32::new(), idx: 0 }
 	}
+}
 
-	fn get(&self) -> i32 {
-		return self.cls.value(self.idx);
+impl Value for ValueI32 {
+	fn get(&self) -> String {
+		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
@@ -97,9 +103,108 @@ impl<'a> Value<'a, i32> for ValueI32 {
 	}
 }
 
+pub struct ValueUDT {
+	types: Vec<Type>,
+	values: Vec<Box<Value>>,
+	idx: Vec<usize>,
+}
+
+impl ValueUDT {
+	pub fn create(t: &Type) -> Self {
+		// UDT's 2nd tuple param is a Vec<Box<Type>>, but we want a Vec<Type>.
+		let tys: Vec<Type> = match t {
+			&Type::UDT(ref names, ref types) =>
+				types.iter().map(|x| (**x).clone()).collect(),
+			_ => panic!("{:?} type given to ValueUDT!", t),
+		};
+		// create an appropriate value for every possible type.
+		let mut val: Vec<Box<Value>> = Vec::new();
+		let mut names: Vec<String> = Vec::new();
+		for x in tys.iter() {
+			let v = create(&x);
+			val.push(v);
+		}
+		assert_eq!(tys.len(), val.len());
+		ValueUDT{
+			types: tys,
+			values: val,
+			// we need a vector of 0s the same size as 'values' or 'types'
+			idx: (0..names.len()).map(|_| 0).collect(),
+		}
+	}
+}
+
+impl Value for ValueUDT {
+	fn get(&self) -> String {
+		use std::fmt::Write;
+		let mut rv = String::new();
+		write!(&mut rv, "{{\n").unwrap();
+
+		for i in 0..self.values.len() {
+			let nm = match self.types[i] {
+				Type::Field(ref name, _) => name,
+				_ => panic!("ValueUDT types are not fields?"),
+			};
+			write!(&mut rv, "\t.{} = {},\n", nm, self.values[i].get()).unwrap();
+		}
+
+		write!(&mut rv, "}}").unwrap();
+		return rv;
+	}
+
+	// The number of states a UDT has is all possibilities of all fields.
+	fn n_state(&self) -> usize {
+		self.values.iter().fold(1, |acc, ref v| acc*v.n_state())
+	}
+
+	// We have an index for every field value.  It's sort-of an add-with-carry:
+	// we try to add to the smallest integer, but when that overflows we jump to
+	// the next field's index.
+	// If we reset EVERY index, then we are actually at our end state and nothing
+	// changes.
+	fn next(&mut self) {
+		for (i, v) in self.values.iter().enumerate() {
+			if self.idx[i] < v.n_state()-1 {
+				self.idx[i] = self.idx[i] + 1;
+				return;
+			}
+			self.idx[i] = 0;
+		}
+		// if we got here, then we reset *everything*.  That means we were actually
+		// done, and now we just accidentally reset all the indices to the default
+		// state.  So here we re-reset them to the end state before returning.
+		for (i, v) in self.values.iter().enumerate() {
+			self.idx[i] = v.n_state()
+		}
+	}
+}
+
+pub struct ValuePointer {
+	cls: TC_Pointer,
+	idx: usize,
+}
+
+impl ValuePointer {
+	pub fn create(t: &Type) -> Self {
+		ValuePointer{ cls: TC_Pointer::new(), idx: 0 }
+	}
+}
+
+impl Value for ValuePointer {
+	fn get(&self) -> String { self.cls.value(self.idx).to_string() }
+	fn n_state(&self) -> usize { self.cls.n() }
+	fn next(&mut self) {
+		if self.idx < self.cls.n()-1 {
+			self.idx = self.idx + 1
+		}
+	}
+}
+
+//---------------------------------------------------------------------
+
 pub struct FreeEnum<'a> {
 	pub name: String,
-	pub tested: ValueEnum<'a>,
+	pub tested: ValueEnum,
 	pub dest: Use<'a>,
 	pub ty: &'a Type,
 }
@@ -107,10 +212,7 @@ pub struct FreeEnum<'a> {
 impl<'a> Free for FreeEnum<'a> {
 	fn name(&self) -> String { return self.name.clone(); }
 	fn value(&self) -> String {
-		use std::fmt::Write;
-		let mut res = String::new();
-		write!(&mut res, "{}", self.tested.get()).unwrap();
-		return res;
+		return self.tested.get();
 	}
 }
 
@@ -124,9 +226,18 @@ pub struct FreeI32<'a> {
 impl<'a> Free for FreeI32<'a> {
 	fn name(&self) -> String { return self.name.clone(); }
 	fn value(&self) -> String {
-		use std::fmt::Write;
-		let mut res = String::new();
-		write!(&mut res, "{}", self.tested.get()).unwrap();
-		return res;
+		return self.tested.get();
 	}
+}
+
+pub struct FreeUDT<'a> {
+	pub name: String,
+	pub tested: ValueUDT,
+	pub dest: Use<'a>,
+	pub ty: &'a Type,
+}
+
+impl<'a> Free for FreeUDT<'a> {
+	fn name(&self) -> String { return self.name.clone(); }
+	fn value(&self) -> String { self.tested.get() }
 }
