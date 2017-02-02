@@ -174,6 +174,43 @@ struct API<'a> {
 	dep: &'a Vec<Box<DependentVariable<'a>>>,
 }
 
+fn system(cmd: String) -> Result<(), std::io::Error> {
+	let run = match Command::new(cmd).output() {
+		Err(e) => {
+			println!("Program error: {}", e); // FIXME stderr
+			// cat 'run' ...
+			return Err(e);
+		},
+		Ok(x) => x,
+	};
+	let runout: String = String::from_utf8(run.stdout).unwrap();
+	if runout.len() > 0 {
+		println!("program output: '{}'", runout);
+	}
+	return Ok(());
+}
+
+fn compile(src: &str, dest: &str) -> Result<(), String> {
+	// todo/fixme: don't hardcode arguments, read from config file or similar.
+	let compile = match Command::new("gcc").arg("-Wall").arg("-Wextra")
+	                                       .arg("-fcheck-pointer-bounds")
+	                                       .arg("-mmpx")
+	                                       .arg("-D_GNU_SOURCE").arg("-o")
+	                                       .arg(dest).arg(src).output() {
+		Err(e) => {
+			use std::fmt;
+			let s = fmt::format(format_args!("compilation of {} failed: {}", src, e));
+			return Err(s);
+		},
+		Ok(x) => x,
+	};
+	let comps: String = String::from_utf8(compile.stdout).unwrap();
+	if comps.len() > 0 {
+		println!("gcc output: '{}'", comps);
+	}
+	Ok(())
+}
+
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
@@ -258,13 +295,17 @@ fn main() {
 	let mut used = ValueU64::new();
 	generate(&mut f, &vec![&hcreate_r], &mut used);
 	let outname: &'static str = ".fuzziter";
+	match compile(fname, outname) {
+		Err(x) => panic!(x), Ok(_) => {},
+	};
+/*
 	let compile = match Command::new("gcc").arg("-Wall").arg("-Wextra")
 	                                       .arg("-fcheck-pointer-bounds")
 	                                       .arg("-mmpx")
 	                                       .arg("-D_GNU_SOURCE").arg("-o")
 	                                       .arg(outname).arg(fname).output() {
 		Err(e) => {
-			println!("compilation failed: {}", e); /* FIXME stderr */
+			println!("compilation failed: {}", e); // FIXME stderr
 			panic!("");
 		},
 		Ok(x) => x,
@@ -273,18 +314,10 @@ fn main() {
 	if comps.len() > 0 {
 		println!("gcc output: '{}'", comps);
 	}
+*/
 
 	let cmdname: String = String::from("./") + String::from(outname).as_str();
-	let run = match Command::new(cmdname).output() {
-		Err(e) => {
-			println!("Program error: {}", e); // FIXME stderr
-			// cat .fuzziter ...
-			panic!("Might have found a bug, bailing ...");
-		},
-		Ok(x) => x,
-	};
-	let runout: String = String::from_utf8(run.stdout).unwrap();
-	if runout.len() > 0 {
-		println!("program output: '{}'", runout);
+	if system(cmdname).is_err() {
+		panic!("Might have found a bug, exiting ...");
 	}
 }
