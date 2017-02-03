@@ -298,23 +298,6 @@ fn main() {
 	match compile(fname, outname) {
 		Err(x) => panic!(x), Ok(_) => {},
 	};
-/*
-	let compile = match Command::new("gcc").arg("-Wall").arg("-Wextra")
-	                                       .arg("-fcheck-pointer-bounds")
-	                                       .arg("-mmpx")
-	                                       .arg("-D_GNU_SOURCE").arg("-o")
-	                                       .arg(outname).arg(fname).output() {
-		Err(e) => {
-			println!("compilation failed: {}", e); // FIXME stderr
-			panic!("");
-		},
-		Ok(x) => x,
-	};
-	let comps: String = String::from_utf8(compile.stdout).unwrap();
-	if comps.len() > 0 {
-		println!("gcc output: '{}'", comps);
-	}
-*/
 
 	let cmdname: String = String::from("./") + String::from(outname).as_str();
 	if system(cmdname).is_err() {
