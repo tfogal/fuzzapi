@@ -260,6 +260,13 @@ fn main() {
 			dest: variable::Use::Argument(fqns[1].clone(), 3),
 			ty: hs_data_ptr,
 		});
+		// return type, but it actually comes from an argument...
+		depvar.push(DependentVariable{
+			name: "retval".to_string(),
+			src: variable::Source::Parameter(fqns[1].clone(), 2),
+			dest: variable::Use::Nil,
+			ty: fqns[1].arguments[2].clone(),
+		});
 		freevar.push(Box::new(variable::FreeUDT {
 			name: "item".to_string(),
 			tested: variable::ValueUDT::create(&fqns[1].arguments[0]),
@@ -271,13 +278,6 @@ fn main() {
 			tested: variable::ValueEnum::create(&fqns[1].arguments[1]),
 			dest: variable::Use::Argument(fqns[1].clone(), 1),
 			ty: fqns[1].arguments[1].clone(),
-		}));
-		// return type, but it actually comes from an argument...
-		freevar.push(Box::new(variable::FreeI32 {
-			name: "retval".to_string(),
-			tested: variable::ValueI32::create(&hsrch.arguments[2]),
-			dest: variable::Use::Nil,
-			ty: fqns[1].arguments[2].clone(),
 		}));
 		// todo / fixme: add a method that takes an API and generates the "next"
 		// program.
