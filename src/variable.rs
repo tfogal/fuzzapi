@@ -9,20 +9,21 @@ use tc::*;
 
 // Identifies the source of a variable.  Variable values can be generated via
 // return values, e.g. 'x = f()', or as paramater args, e.g. 'type x; f(&x);'.
-pub enum Source<'a> {
+pub enum Source {
 	Free,
-	Parameter(&'a Function, usize), // function + parameter index it comes from
-	ReturnValue(&'a Function),
+	Parameter(Function, usize), // function + parameter index it comes from
+	ReturnValue(Function),
 }
 
 // Details where a value is used: which parameter of which function.
-pub enum Use<'a> {
+pub enum Use {
 	Nil, // isn't used.
-	Argument(&'a Function, usize), // function + parameter index it comes from
+	Argument(Function, usize), // function + parameter index it comes from
 }
 
 // Free is a container for all of the variable information.
 pub trait Free {
+	fn typename(&self) -> String;
 	fn name(&self) -> String;
 	// Generate a C expression that could be used in initializing a value of this
 	// variable.
@@ -44,6 +45,7 @@ pub fn create(t: &Type) -> Box<Value> {
 		&Type::Enum(_, _) => Box::new(ValueEnum::create(t)),
 		&Type::I32 => Box::new(ValueI32::create(t)),
 		&Type::Pointer(_) => Box::new(ValuePointer::create(t)),
+		&Type::Field(_, ref x) => create(x),
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
 }
@@ -142,12 +144,12 @@ impl Value for ValueUDT {
 		for i in 0..self.values.len() {
 			let nm = match self.types[i] {
 				Type::Field(ref name, _) => name,
-				_ => panic!("ValueUDT types are not fields?"),
+				ref x => panic!("ValueUDT types are {:?}, not fields?", x),
 			};
-			write!(&mut rv, "\t.{} = {},\n", nm, self.values[i].get()).unwrap();
+			write!(&mut rv, "\t\t.{} = {},\n", nm, self.values[i].get()).unwrap();
 		}
 
-		write!(&mut rv, "}}").unwrap();
+		write!(&mut rv, "\t}}").unwrap();
 		return rv;
 	}
 
@@ -202,42 +204,45 @@ impl Value for ValuePointer {
 
 //---------------------------------------------------------------------
 
-pub struct FreeEnum<'a> {
+pub struct FreeEnum {
 	pub name: String,
 	pub tested: ValueEnum,
-	pub dest: Use<'a>,
-	pub ty: &'a Type,
+	pub dest: Use,
+	pub ty: Type,
 }
 
-impl<'a> Free for FreeEnum<'a> {
+impl Free for FreeEnum {
+	fn typename(&self) -> String { return self.ty.name(); }
 	fn name(&self) -> String { return self.name.clone(); }
 	fn value(&self) -> String {
 		return self.tested.get();
 	}
 }
 
-pub struct FreeI32<'a> {
+pub struct FreeI32 {
 	pub name: String,
 	pub tested: ValueI32,
-	pub dest: Use<'a>,
-	pub ty: &'a Type,
+	pub dest: Use,
+	pub ty: Type,
 }
 
-impl<'a> Free for FreeI32<'a> {
+impl Free for FreeI32 {
+	fn typename(&self) -> String { return self.ty.name(); }
 	fn name(&self) -> String { return self.name.clone(); }
 	fn value(&self) -> String {
 		return self.tested.get();
 	}
 }
 
-pub struct FreeUDT<'a> {
+pub struct FreeUDT {
 	pub name: String,
 	pub tested: ValueUDT,
-	pub dest: Use<'a>,
-	pub ty: &'a Type,
+	pub dest: Use,
+	pub ty: Type,
 }
 
-impl<'a> Free for FreeUDT<'a> {
+impl Free for FreeUDT {
+	fn typename(&self) -> String { return self.ty.name(); }
 	fn name(&self) -> String { return self.name.clone(); }
 	fn value(&self) -> String { self.tested.get() }
 }

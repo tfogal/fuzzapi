@@ -16,41 +16,6 @@ macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
 
-trait Name {
-	fn name(&self) -> String;
-}
-
-impl Name for Type {
-	fn name<'a>(&'a self) -> String {
-		use typ::Type::*;
-		let mut res = String::new();
-		match self {
-			&U8 => "uint8_t",
-			&I8 => "int8_t",
-			&U16 => "uint16_t", &I16 => "int16_t",
-			&U32 => "uint32_t", &I32 => "int32_t",
-			&U64 => "uint64_t", &I64 => "int64_t",
-			&F32 => "float", &F64 => "double",
-			&Usize => "size_t", &Integer => "int", &Unsigned => "unsigned",
-			&Character => "char",
-			&Void => "void",
-			&Enum(ref enm, _) => {
-				tryp!(write!(&mut res, "enum {}", enm));
-				res.as_str().clone()
-			},
-			&Type::UDT(ref udt, _) => udt,
-			&Type::Field(_, ref ty) => {
-				tryp!(write!(&mut res, "{}", ty.name()));
-				res.as_str().clone()
-			},
-			&Type::Pointer(ref t) => {
-				tryp!(write!(&mut res, "{}*", t.name()));
-				res.as_str().clone()
-			},
-		}.to_string()
-	}
-}
-
 /* todo this is outdated and broken */
 struct ValueU64 {
 	tested: bloom::Bloom,
@@ -90,11 +55,11 @@ impl ValueU64 {
 // Then 'v' is dependent.  The effect is mostly that we don't attach a Value to
 // it.
 #[allow(dead_code)]
-struct DependentVariable<'a> {
+struct DependentVariable {
 	name: String,
-	src: variable::Source<'a>,
-	dest: variable::Use<'a>,
-	// do we need a type: Type ?
+	src: variable::Source,
+	dest: variable::Use,
+	ty: Type,
 }
 
 // A free variable is a variable that we DO have control over.  This generally
@@ -104,7 +69,7 @@ struct DependentVariable<'a> {
 struct FreeVariableU64<'a> {
 	name: String,
 	tested: ValueU64, // probably want to parametrize
-	dest: variable::Use<'a>,
+	dest: variable::Use,
 	ty: &'a Type,
 }
 
@@ -170,8 +135,55 @@ fn generate(mut strm: &mut std::io::Write, functions: &Vec<&Function>,
 // An API is a collection of Functions, DependentVariables, and FreeVariables.
 struct API<'a> {
 	fqn: &'a Vec<Function>,
-	free: &'a Vec<Box<variable::Free>>,
-	dep: &'a Vec<Box<DependentVariable<'a>>>,
+	free: Vec<Box<variable::Free>>,
+	dep: Vec<DependentVariable>,
+}
+
+fn header(strm: &mut std::io::Write, hdrs: &Vec<&str>) -> std::io::Result<()>
+{
+	try!(writeln!(strm, "#define _POSIX_C_SOURCE 201212L"));
+	try!(writeln!(strm, "#define _GNU_SOURCE 1"));
+	for h in hdrs.iter() {
+		try!(writeln!(strm, "#include <{}>", h));
+	}
+	try!(writeln!(strm, "\nint main() {{"));
+	return Ok(());
+}
+
+fn gen(mut strm: &mut std::io::Write, api: &API) -> std::io::Result<()>
+{
+	let hdrs: Vec<&str> = vec!["search.h"];
+	try!(header(strm, &hdrs));
+	// create variables for all the dep vars.
+	for v in api.dep.iter() {
+		// If the type is a pointer, we actually want a normal object; we'll take
+		// the address of it when we pass it to the function.
+		let typename: String = match v.ty {
+			Type::Pointer(ref x) => x.name(),
+			ref x => x.name(),
+		};
+		match v.src {
+			variable::Source::Free =>
+				try!(writeln!(&mut strm, "\t{} {} = ???;", typename, v.name)),
+			variable::Source::Parameter(ref fqn, ref idx) =>
+				try!(writeln!(&mut strm, "\t{} {}; /* from {}:{} */", typename, v.name,
+				              fqn.name, idx)),
+			variable::Source::ReturnValue(ref fqn) =>
+				try!(writeln!(&mut strm, "\t{} {}; /* = {}(...); */", typename, v.name,
+				              fqn.name)),
+		};
+	}
+
+	// create variables for all the free variables.
+	for v in api.free.iter() {
+		let typ: String = v.typename();
+		let name: String = v.name();
+		let initializer: String = v.value();
+		try!(writeln!(strm, "\t{} {} = {}; /* free */", typ, name, initializer));
+	}
+
+	try!(writeln!(strm, "}}"));
+	return Ok(());
 }
 
 fn system(cmd: String) -> Result<(), std::io::Error> {
@@ -214,13 +226,15 @@ fn compile(src: &str, dest: &str) -> Result<(), String> {
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
-	let hcreate_r_args = vec![Type::Usize, hs_data_ptr];
+	let hcreate_r_args = vec![Type::Usize, hs_data_ptr.clone()];
 	let hcreate_r  = Function { return_type: Type::Integer,
 	                            arguments: hcreate_r_args,
 	                            name: "hcreate_r".to_string() };
+	let char_ptr = Type::Pointer(Box::new(Type::Character));
+	let void_ptr = Type::Pointer(Box::new(Type::Void));
 	let entry = Type::UDT("ENTRY".to_string(),
-		vec![Box::new(Type::Pointer(Box::new(Type::Character))),
-		     Box::new(Type::Pointer(Box::new(Type::Void)))]
+		vec![Box::new(Type::Field("key".to_string(), Box::new(char_ptr))),
+		     Box::new(Type::Field("data".to_string(), Box::new(void_ptr)))]
 	);
 	let mut action_values: BTreeMap<String, u32> = BTreeMap::new();
 	action_values.insert("FIND".to_string(), 0);
@@ -238,34 +252,48 @@ fn main() {
 
 	{
 		let fqns: Vec<Function> = vec![hcreate_r.clone(), hsrch.clone()];
-		let mut depvar: Vec<Box<DependentVariable>> = Vec::new();
+		let mut depvar: Vec<DependentVariable> = Vec::new();
 		let mut freevar: Vec<Box<variable::Free>> = Vec::new();
-		depvar.push(Box::new(DependentVariable{
+		depvar.push(DependentVariable{
 			name: "tbl".to_string(),
-			src: variable::Source::Parameter(&fqns[0], 1),
-			dest: variable::Use::Argument(&fqns[1], 3),
-		}));
+			src: variable::Source::Parameter(fqns[0].clone(), 1),
+			dest: variable::Use::Argument(fqns[1].clone(), 3),
+			ty: hs_data_ptr,
+		});
 		freevar.push(Box::new(variable::FreeUDT {
 			name: "item".to_string(),
 			tested: variable::ValueUDT::create(&fqns[1].arguments[0]),
-			dest: variable::Use::Argument(&fqns[1], 0),
-			ty: &hsrch.arguments[0],
+			dest: variable::Use::Argument(fqns[1].clone(), 0),
+			ty: hsrch.arguments[0].clone(),
 		}));
 		freevar.push(Box::new(variable::FreeEnum {
 			name: "action".to_string(),
 			tested: variable::ValueEnum::create(&fqns[1].arguments[1]),
-			dest: variable::Use::Argument(&fqns[1], 1),
-			ty: &fqns[1].arguments[1],
+			dest: variable::Use::Argument(fqns[1].clone(), 1),
+			ty: fqns[1].arguments[1].clone(),
 		}));
 		// return type, but it actually comes from an argument...
 		freevar.push(Box::new(variable::FreeI32 {
 			name: "retval".to_string(),
 			tested: variable::ValueI32::create(&hsrch.arguments[2]),
 			dest: variable::Use::Nil,
-			ty: &fqns[1].arguments[2],
+			ty: fqns[1].arguments[2].clone(),
 		}));
 		// todo / fixme: add a method that takes an API and generates the "next"
 		// program.
+		{
+			let mut api = API { fqn: &fqns, free: freevar, dep: depvar };
+			let fnm: &'static str = "/tmp/newfuzz.c";
+			let mut f = File::create(fnm).expect("could not create file");
+			match gen(&mut f, &mut api) {
+				Err(x) => panic!(x), _ => {},
+			};
+			use std::io::Write;
+			match f.flush() {
+				Err(x) => panic!("error creating {}: {}", fnm, x),
+				Ok(_) => {},
+			};
+		}
 	}
 
 	// next:
