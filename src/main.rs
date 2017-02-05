@@ -1,5 +1,4 @@
 use std::collections::btree_map::BTreeMap;
-use std::fmt::Write;
 use std::fs::File;
 use std::process::Command;
 extern crate rand;
@@ -45,21 +44,6 @@ impl ValueU64 {
 		self.tested.add(sample);
 		return sample;
 	}
-}
-
-// A dependent variable is a variable that we don't actually have control over.
-// For example, if the API model states that 'the return value of f() must be
-// the second argument of g()', a la:
-//   type v = f();
-//   g(_, v);
-// Then 'v' is dependent.  The effect is mostly that we don't attach a Value to
-// it.
-#[allow(dead_code)]
-struct DependentVariable {
-	name: String,
-	src: variable::Source,
-	dest: variable::Use,
-	ty: Type,
 }
 
 // A free variable is a variable that we DO have control over.  This generally
@@ -132,11 +116,11 @@ fn generate(mut strm: &mut std::io::Write, functions: &Vec<&Function>,
 	tryp!(writeln!(strm, "}}"));
 }
 
-// An API is a collection of Functions, DependentVariables, and FreeVariables.
+// An API is a collection of Functions, Dependent vars, and Free vars.
 struct API<'a> {
 	fqn: &'a Vec<Function>,
 	free: Vec<Box<variable::Free>>,
-	dep: Vec<DependentVariable>,
+	dep: Vec<variable::Dependent>,
 }
 
 fn header(strm: &mut std::io::Write, hdrs: &Vec<&str>) -> std::io::Result<()>
@@ -180,6 +164,9 @@ fn gen(mut strm: &mut std::io::Write, api: &API) -> std::io::Result<()>
 		let name: String = v.name();
 		let initializer: String = v.value();
 		try!(writeln!(strm, "\t{} {} = {}; /* free */", typ, name, initializer));
+	}
+
+	for _ in api.fqn {
 	}
 
 	try!(writeln!(strm, "}}"));
@@ -252,16 +239,16 @@ fn main() {
 
 	{
 		let fqns: Vec<Function> = vec![hcreate_r.clone(), hsrch.clone()];
-		let mut depvar: Vec<DependentVariable> = Vec::new();
+		let mut depvar: Vec<variable::Dependent> = Vec::new();
 		let mut freevar: Vec<Box<variable::Free>> = Vec::new();
-		depvar.push(DependentVariable{
+		depvar.push(variable::Dependent{
 			name: "tbl".to_string(),
 			src: variable::Source::Parameter(fqns[0].clone(), 1),
 			dest: variable::Use::Argument(fqns[1].clone(), 3),
 			ty: hs_data_ptr,
 		});
 		// return type, but it actually comes from an argument...
-		depvar.push(DependentVariable{
+		depvar.push(variable::Dependent{
 			name: "retval".to_string(),
 			src: variable::Source::Parameter(fqns[1].clone(), 2),
 			dest: variable::Use::Nil,

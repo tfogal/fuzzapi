@@ -30,6 +30,20 @@ pub trait Free {
 	fn value(&self) -> String;
 }
 
+// A dependent variable is a variable that we don't actually have control over.
+// For example, if the API model states that 'the return value of f() must be
+// the second argument of g()', a la:
+//   type v = f();
+//   g(_, v);
+// Then 'v' is dependent.  The effect is mostly that we don't attach a Value to
+// it.
+pub struct Dependent {
+	pub name: String,
+	pub src: Source,
+	pub dest: Use,
+	pub ty: Type,
+}
+
 // A Value holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in that sequence.
 pub trait Value {
