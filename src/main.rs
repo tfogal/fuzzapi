@@ -15,7 +15,7 @@ macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
 
-/* todo this is outdated and broken */
+/* todo this is outdated and broken. Should use variable::Free's. */
 struct ValueU64 {
 	tested: bloom::Bloom,
 	rng: rand::ThreadRng,
@@ -44,17 +44,6 @@ impl ValueU64 {
 		self.tested.add(sample);
 		return sample;
 	}
-}
-
-// A free variable is a variable that we DO have control over.  This generally
-// means variables that are API inputs.
-#[allow(dead_code)]
-// todo this is broken, but the idea of a u64 free var should be in variable.rs
-struct FreeVariableU64<'a> {
-	name: String,
-	tested: ValueU64, // probably want to parametrize
-	dest: variable::Use,
-	ty: &'a Type,
 }
 
 fn prototypes(strm: &mut std::io::Write, functions: &Vec<&Function>) {
