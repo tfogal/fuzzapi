@@ -68,7 +68,7 @@ mod test {
 	#[test]
 	fn blnone() {
 		let bl = Bloom::new();
-		for i in 0..MAX_BITS {
+		for i in 0..super::MAX_BITS {
 			assert_eq!(bl.query(i), false);
 		}
 	}
