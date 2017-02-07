@@ -12,7 +12,8 @@ fn hash1(x: u64) -> u16 {
 	return (x % MAX_BITS) as u16;
 }
 fn hash2(x: u64) -> u16 {
-	let t = ((x >> 24).wrapping_mul(x >> 24) + (x >> 12) + (x >> 6)) % MAX_BITS;
+	let t = (x >> 24).wrapping_mul(x >> 24).wrapping_add(x >> 12);
+	let t = (t + (x >> 6)) % MAX_BITS;
 	return t as u16;
 }
 fn hash3(x: u64) -> u16 {
