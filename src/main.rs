@@ -155,7 +155,40 @@ fn gen(mut strm: &mut std::io::Write, api: &API) -> std::io::Result<()>
 		try!(writeln!(strm, "\t{} {} = {}; /* free */", typ, name, initializer));
 	}
 
-	for _ in api.fqn {
+	for (i, fqn) in api.fqn.iter().enumerate() {
+		try!(write!(strm, "\t{} f{} = {}(", fqn.return_type.name(), i, fqn.name));
+		// What we'd like to do is iterate over the arguments and go from an
+		// argument to a DepVar or a FreeVar, and then use that DepVar or FreeVar
+		// to give us the variable name to put here.  But Functions don't have
+		// these variables.  So we need to iterate through every depvar/freevar and
+		// figure out if it's appropriate ...
+		for (a, arg) in fqn.arguments.iter().enumerate() {
+			for d in api.dep.iter() {
+				match d.src {
+					variable::Source::Parameter(ref func, argnum) => {
+						if func == fqn && a == argnum {
+							// todo: auto-inserting address-of here, figure that out from the
+							// types instead?
+							try!(write!(strm, "&{}", d.name));
+						}
+					},
+					variable::Source::Free => {},
+					variable::Source::ReturnValue(_) => {},
+				};
+				match d.dest {
+					variable::Use::Argument(ref func, argnum) => {
+						if func == fqn && a == argnum {
+							try!(write!(strm, "{}", d.name));
+						}
+					},
+					variable::Use::Nil => {},
+				};
+			}
+			if a != fqn.arguments.len()-1 {
+				try!(write!(strm, ", "));
+			}
+		}
+		try!(writeln!(strm, ");"));
 	}
 
 	try!(writeln!(strm, "}}"));
