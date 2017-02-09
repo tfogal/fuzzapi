@@ -9,6 +9,7 @@ use tc::*;
 
 // Identifies the source of a variable.  Variable values can be generated via
 // return values, e.g. 'x = f()', or as paramater args, e.g. 'type x; f(&x);'.
+#[allow(dead_code)]
 pub enum Source {
 	Free,
 	Parameter(Function, usize), // function + parameter index it comes from
@@ -233,6 +234,7 @@ impl Free for FreeEnum {
 	}
 }
 
+#[allow(dead_code)]
 pub struct FreeI32 {
 	pub name: String,
 	pub tested: ValueI32,

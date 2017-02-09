@@ -38,9 +38,9 @@ pub trait TypeClass<T> {
 // Specialization is not yet stable in rust.  Thus the types are not type
 // parameters but baked into the type name.  Sigh.
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 pub struct TC_U8 {}
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 pub struct TC_U16 {}
 /*...*/
 #[allow(non_camel_case_types)]

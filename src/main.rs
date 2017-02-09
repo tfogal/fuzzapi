@@ -162,7 +162,7 @@ fn gen(mut strm: &mut std::io::Write, api: &API) -> std::io::Result<()>
 		// to give us the variable name to put here.  But Functions don't have
 		// these variables.  So we need to iterate through every depvar/freevar and
 		// figure out if it's appropriate ...
-		for (a, arg) in fqn.arguments.iter().enumerate() {
+		for a in 0..fqn.arguments.len() {
 			for d in api.dep.iter() {
 				match d.src {
 					variable::Source::Parameter(ref func, argnum) => {
