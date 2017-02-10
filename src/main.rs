@@ -285,13 +285,13 @@ fn main() {
 		});
 		freevar.push(Box::new(variable::FreeUDT {
 			name: "item".to_string(),
-			tested: variable::ValueUDT::create(&fqns[1].arguments[0]),
+			tested: variable::GenUDT::create(&fqns[1].arguments[0]),
 			dest: variable::Use::Argument(fqns[1].clone(), 0),
 			ty: hsrch.arguments[0].clone(),
 		}));
 		freevar.push(Box::new(variable::FreeEnum {
 			name: "action".to_string(),
-			tested: variable::ValueEnum::create(&fqns[1].arguments[1]),
+			tested: variable::GenEnum::create(&fqns[1].arguments[1]),
 			dest: variable::Use::Argument(fqns[1].clone(), 1),
 			ty: fqns[1].arguments[1].clone(),
 		}));

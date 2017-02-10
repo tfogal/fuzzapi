@@ -1,7 +1,7 @@
 // This holds information about a variable is used in an API.  Breifly:
 //   Source: where the variable comes from / how it is generated
 //   Use: where the variable is consumed, i.e. which parameter to which fqn
-//   Value: holds the current/next state in the TypeClass list (tc.rs)
+//   Generator: holds the current/next state in the TypeClass list (tc.rs)
 //   Free: container for everything.  code gen.
 use function::*;
 use typ::*;
@@ -36,8 +36,8 @@ pub trait Free {
 // the second argument of g()', a la:
 //   type v = f();
 //   g(_, v);
-// Then 'v' is dependent.  The effect is mostly that we don't attach a Value to
-// it.
+// Then 'v' is dependent.  The effect is mostly that we don't attach a
+// Generator to it.
 pub struct Dependent {
 	pub name: String,
 	pub src: Source,
@@ -45,9 +45,9 @@ pub struct Dependent {
 	pub ty: Type,
 }
 
-// A Value holds TypeClass information and helps us iterate through the
+// A Generator holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in that sequence.
-pub trait Value {
+pub trait Generator {
 	// Grabs the current state as an expression.
 	fn get(&self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
@@ -55,11 +55,11 @@ pub trait Value {
 	fn n_state(&self) -> usize;
 }
 
-pub fn create(t: &Type) -> Box<Value> {
+pub fn create(t: &Type) -> Box<Generator> {
 	match t {
-		&Type::Enum(_, _) => Box::new(ValueEnum::create(t)),
-		&Type::I32 => Box::new(ValueI32::create(t)),
-		&Type::Pointer(_) => Box::new(ValuePointer::create(t)),
+		&Type::Enum(_, _) => Box::new(GenEnum::create(t)),
+		&Type::I32 => Box::new(GenI32::create(t)),
+		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
 		&Type::Field(_, ref x) => create(x),
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
@@ -67,18 +67,18 @@ pub fn create(t: &Type) -> Box<Value> {
 
 //---------------------------------------------------------------------
 
-pub struct ValueEnum {
+pub struct GenEnum {
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
 }
 
-impl ValueEnum {
+impl GenEnum {
 	pub fn create(t: &Type) -> Self {
-		ValueEnum{cls: TC_Enum::new(t), idx: 0}
+		GenEnum{cls: TC_Enum::new(t), idx: 0}
 	}
 }
 
-impl Value for ValueEnum {
+impl Generator for GenEnum {
 	fn get(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -93,18 +93,18 @@ impl Value for ValueEnum {
 	}
 }
 
-pub struct ValueI32 {
+pub struct GenI32 {
 	cls: TC_I32,
 	idx: usize,
 }
 
-impl ValueI32 {
+impl GenI32 {
 	pub fn create(_: &Type) -> Self {
-		ValueI32{ cls: TC_I32::new(), idx: 0 }
+		GenI32{ cls: TC_I32::new(), idx: 0 }
 	}
 }
 
-impl Value for ValueI32 {
+impl Generator for GenI32 {
 	fn get(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -119,29 +119,29 @@ impl Value for ValueI32 {
 	}
 }
 
-pub struct ValueUDT {
+pub struct GenUDT {
 	types: Vec<Type>,
-	values: Vec<Box<Value>>,
+	values: Vec<Box<Generator>>,
 	idx: Vec<usize>,
 }
 
-impl ValueUDT {
+impl GenUDT {
 	pub fn create(t: &Type) -> Self {
 		// UDT's 2nd tuple param is a Vec<Box<Type>>, but we want a Vec<Type>.
 		let tys: Vec<Type> = match t {
 			&Type::UDT(_, ref types) =>
 				types.iter().map(|x| (**x).clone()).collect(),
-			_ => panic!("{:?} type given to ValueUDT!", t),
+			_ => panic!("{:?} type given to GenUDT!", t),
 		};
 		// create an appropriate value for every possible type.
-		let mut val: Vec<Box<Value>> = Vec::new();
+		let mut val: Vec<Box<Generator>> = Vec::new();
 		for x in tys.iter() {
 			let v = create(&x);
 			val.push(v);
 		}
 		let nval: usize = val.len();
 		assert_eq!(tys.len(), val.len());
-		ValueUDT{
+		GenUDT{
 			types: tys,
 			values: val,
 			// we need a vector of 0s the same size as 'values' or 'types'
@@ -150,7 +150,7 @@ impl ValueUDT {
 	}
 }
 
-impl Value for ValueUDT {
+impl Generator for GenUDT {
 	fn get(&self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
@@ -159,7 +159,7 @@ impl Value for ValueUDT {
 		for i in 0..self.values.len() {
 			let nm = match self.types[i] {
 				Type::Field(ref name, _) => name,
-				ref x => panic!("ValueUDT types are {:?}, not fields?", x),
+				ref x => panic!("GenUDT types are {:?}, not fields?", x),
 			};
 			write!(&mut rv, "\t\t.{} = {},\n", nm, self.values[i].get()).unwrap();
 		}
@@ -195,19 +195,19 @@ impl Value for ValueUDT {
 	}
 }
 
-pub struct ValuePointer {
+pub struct GenPointer {
 	cls: TC_Pointer,
 	idx: usize,
 }
 
-impl ValuePointer {
+impl GenPointer {
 	pub fn create(_: &Type) -> Self {
 		// doesn't seem to be a good way to assert that t is a &Type::Pointer...
-		ValuePointer{ cls: TC_Pointer::new(), idx: 0 }
+		GenPointer{ cls: TC_Pointer::new(), idx: 0 }
 	}
 }
 
-impl Value for ValuePointer {
+impl Generator for GenPointer {
 	fn get(&self) -> String { self.cls.value(self.idx).to_string() }
 	fn n_state(&self) -> usize { self.cls.n() }
 	fn next(&mut self) {
@@ -221,7 +221,7 @@ impl Value for ValuePointer {
 
 pub struct FreeEnum {
 	pub name: String,
-	pub tested: ValueEnum,
+	pub tested: GenEnum,
 	pub dest: Use,
 	pub ty: Type,
 }
@@ -237,7 +237,7 @@ impl Free for FreeEnum {
 #[allow(dead_code)]
 pub struct FreeI32 {
 	pub name: String,
-	pub tested: ValueI32,
+	pub tested: GenI32,
 	pub dest: Use,
 	pub ty: Type,
 }
@@ -252,7 +252,7 @@ impl Free for FreeI32 {
 
 pub struct FreeUDT {
 	pub name: String,
-	pub tested: ValueUDT,
+	pub tested: GenUDT,
 	pub dest: Use,
 	pub ty: Type,
 }
