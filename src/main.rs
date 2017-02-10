@@ -211,13 +211,16 @@ fn system(cmd: String) -> Result<(), std::io::Error> {
 	return Ok(());
 }
 
-fn compile(src: &str, dest: &str) -> Result<(), String> {
+fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 	// todo/fixme: don't hardcode arguments, read from config file or similar.
-	let compile = match Command::new("gcc").arg("-Wall").arg("-Wextra")
-	                                       .arg("-fcheck-pointer-bounds")
-	                                       .arg("-mmpx")
-	                                       .arg("-D_GNU_SOURCE").arg("-o")
-	                                       .arg(dest).arg(src).output() {
+	let mut cmd = Command::new("gcc");
+	for flg in flags.iter() {
+		cmd.arg(flg);
+	}
+	cmd.arg("-o");
+	cmd.arg(dest);
+	cmd.arg(src);
+	let compile = match cmd.output() {
 		Err(e) => {
 			use std::fmt;
 			let s = fmt::format(format_args!("compilation of {} failed: {}", src, e));
@@ -228,8 +231,12 @@ fn compile(src: &str, dest: &str) -> Result<(), String> {
 	let comps: String = String::from_utf8(compile.stdout).unwrap();
 	if comps.len() > 0 {
 		println!("gcc output: '{}'", comps);
+		return Err("compilation failed".to_string());
 	}
-	Ok(())
+	match cmd.status() {
+		Err(e) => return Err(format!("err: {}", e)),
+		Ok(_) => return Ok(()),
+	}
 }
 
 fn main() {
@@ -332,7 +339,9 @@ fn main() {
 	let mut used = ValueU64::new();
 	generate(&mut f, &vec![&hcreate_r], &mut used);
 	let outname: &'static str = ".fuzziter";
-	match compile(fname, outname) {
+	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
+	                "-D_GNU_SOURCE"];
+	match compile(fname, outname, &args) {
 		Err(x) => panic!(x), Ok(_) => {},
 	};
 
