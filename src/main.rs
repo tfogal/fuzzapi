@@ -44,6 +44,28 @@ fn header(strm: &mut std::io::Write, hdrs: &Vec<&str>) -> std::io::Result<()>
 	return Ok(());
 }
 
+// Prints out the variable name as it would be used in an r-value context.
+// Notably this includes any scalar operations that need to be applied in the
+// given context.
+fn rvalue(src: &variable::Source) -> String {
+	use std::fmt::Write;
+	let mut rv = String::new();
+
+	match src {
+		&variable::Source::Free(ref nm, _, ref op) => {
+			tryp!(write!(rv, "{}{}", op.to_string(), nm));
+		},
+		&variable::Source::Return(_, _) => {
+			tryp!(write!(rv, "/*fixme, from ret*/"));
+		},
+		&variable::Source::Parent(ref spar, _) => {
+			// should we be prepending the ScalarOp to whatever the recursion gives?
+			return rvalue(spar);
+		},
+	}
+	return rv;
+}
+
 fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) ->
 	std::io::Result<()> {
 	let hdrs: Vec<&str> = vec!["search.h"];
@@ -59,37 +81,22 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) ->
 
 	use std::ops::Deref;
 	for fqn in fqns {
-		let (ref rettype, ref src) = fqn.return_type;
-		match src.deref() {
-			&variable::Source::Free(ref nm, ref gen, ref op) => {
-				try!(writeln!(strm, "\t{} {} = {};", rettype.name(), nm, gen.get()));
-			},
-			_ => {} // all variables ultimately come from a free slot
-		};
+		// declare all variables used as arguments to the function
 		for ref arg in fqn.arguments.iter() {
 			let &(ref argtype, ref src) = *arg;
 			match src.deref() {
-				&variable::Source::Free(ref nm, ref gen, ref op) => {
+				&variable::Source::Free(ref nm, ref gen, _) => {
 					try!(writeln!(strm, "\t{} {} = {};", argtype.name(), nm, gen.get()));
 				},
 				_ => {} // all vars eventually come from a free
 			}
 		};
+		let (ref rettype, ref src) = fqn.return_type;
+		try!(write!(strm, "\t{} {} = {}(", rettype.name(), src.name(), fqn.name));
 
-		try!(write!(strm, "\t/*{} = */ {}(", rettype.name(), fqn.name));
 		for (a, ref arg) in fqn.arguments.iter().enumerate() {
-			let &(ref argtype, ref src) = *arg;
-			match src.deref() {
-				&variable::Source::Free(ref nm, _, ref op) => {
-					try!(write!(strm, "{}{}", op.to_string(), nm));
-				},
-				&variable::Source::Return(_, _) => {
-					try!(write!(strm, "/*fixme, from ret*/"));
-				},
-				&variable::Source::Parent(_, _) => {
-					try!(write!(strm, "/*fixme, from parent*/"));
-				},
-			};
+			let &(_, ref src) = *arg;
+			try!(write!(strm, "{}", rvalue(src.deref())));
 			if a < fqn.arguments.len()-1 {
 				try!(write!(strm, ", "));
 			}
@@ -159,6 +166,7 @@ fn main() {
 	action_values.insert("ENTER".to_string(), 1);
 	let action = Type::Enum("ACTION".to_string(), action_values);
 
+	let fname: &'static str = "/tmp/fuzziter.c";
 	{
 		use variable::ScalarOp;
 		let nel = variable::Source::Free("nel".to_string(),
@@ -198,7 +206,7 @@ fn main() {
 			(entry, Rc::new(item)),
 			(action, Rc::new(actvar)),
 			(entryp, Rc::new(rv)),
-			(hs_data.clone(), hsd_var),
+			(hs_data_ptr.clone(), Rc::new(htab)),
 		];
 		let hs_rv = variable::Source::Free("hserr".to_string(),
 		                                   variable::generator(&Type::I32),
@@ -209,7 +217,6 @@ fn main() {
 			name: "hsearch_r".to_string(),
 		};
 
-		let fname: &'static str = "/tmp/tjfnewtest.c";
 		let mut newtest = match File::create(fname) {
 			Err(e) => {
 				println!("Could not create {}: {}", fname, e); /* FIXME stderr */
@@ -217,10 +224,11 @@ fn main() {
 			},
 			Ok(x) => x,
 		};
-		gen(&mut newtest, &vec![hcreate, hsearch]);
+		match gen(&mut newtest, &vec![hcreate, hsearch]) {
+			Err(x) => panic!(x),
+			Ok(_) => {},
+		};
 	}
-
-/*
 	let outname: &'static str = ".fuzziter";
 	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
 	                "-D_GNU_SOURCE"];
@@ -232,5 +240,4 @@ fn main() {
 	if system(cmdname).is_err() {
 		panic!("Might have found a bug, exiting ...");
 	}
-*/
 }

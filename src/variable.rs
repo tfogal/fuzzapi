@@ -21,6 +21,16 @@ pub enum Source {
 	Parent(Rc<Source>, ScalarOp),
 }
 
+impl Name for Source {
+	fn name(&self) -> String {
+		match self {
+			&Source::Return(ref fqn, _) => return fqn.name.clone(),
+			&Source::Free(ref nm, _, _) => return nm.clone(),
+			&Source::Parent(ref src, _) => return src.name(),
+		}
+	}
+}
+
 // A variable has a root type, but when used in functions it may need to be
 // transformed in some way.  The classic example is a stack variable that needs
 // address-of to be passed to a method that accepts it by pointer.
@@ -60,7 +70,7 @@ pub fn generator(t: &Type) -> Box<Generator> {
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
 		&Type::Field(_, ref x) => generator(x),
 		&Type::Usize => Box::new(GenUsize::create(t)),
-		&Type::UDT(_, ref flds) => Box::new(GenUDT::create(t)),
+		&Type::UDT(_, _) => Box::new(GenUDT::create(t)),
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
 }
