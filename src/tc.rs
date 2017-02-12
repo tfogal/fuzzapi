@@ -42,6 +42,8 @@ pub trait TypeClass<T> {
 pub struct TC_U8 {}
 #[allow(non_camel_case_types, dead_code)]
 pub struct TC_U16 {}
+#[allow(non_camel_case_types)]
+pub struct TC_Usize {}
 /*...*/
 #[allow(non_camel_case_types)]
 pub struct TC_I32 {}
@@ -85,6 +87,26 @@ impl TypeClass<u16> for TC_U16 {
 			1 => du16_1_32767.ind_sample(&mut rng),
 			2 => du16_32768_65534.ind_sample(&mut rng),
 			3 => 65535,
+			_ => panic!("invalid type class {} given for u16!", class),
+		}
+	}
+}
+
+impl TC_Usize {
+	pub fn new() -> Self { TC_Usize{} }
+}
+impl TypeClass<usize> for TC_Usize {
+	fn n(&self) -> usize { return 4; }
+	fn value(&self, class: usize) -> usize {
+		//let du_pos_small = Range::new(1, i32::max_value()/2);
+		let mut rng: rand::ThreadRng = rand::thread_rng();
+		let du_small = Range::new(1, usize::max_value()/2);
+		let du_large = Range::new(usize::max_value()/2+1, usize::max_value()-1);
+		match class {
+			0 => 0,
+			1 => du_small.ind_sample(&mut rng),
+			2 => du_large.ind_sample(&mut rng),
+			3 => usize::max_value(),
 			_ => panic!("invalid type class {} given for u16!", class),
 		}
 	}

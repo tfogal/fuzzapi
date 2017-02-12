@@ -1,48 +1,43 @@
 // This holds information about a variable is used in an API.  Breifly:
 //   Source: where the variable comes from / how it is generated
-//   Use: where the variable is consumed, i.e. which parameter to which fqn
+//   ScalarOp: transformation to apply to a variable to use in the context a
+//             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
-//   Free: container for everything.  code gen.
+use std::rc::Rc;
 use function::*;
 use typ::*;
 use tc::*;
 
-// Identifies the source of a variable.  Variable values can be generated via
-// return values, e.g. 'x = f()', or as paramater args, e.g. 'type x; f(&x);'.
-#[allow(dead_code)]
+// A variable Source is either the return value of a function, a "parent"
+// (variable that was passed to another function, earlier), or "Free" in the
+// sense that we can choose its value.
 pub enum Source {
-	Free,
-	Parameter(Function, usize), // function + parameter index it comes from
-	ReturnValue(Function),
+	// e.g. in 'x = f(); g(&x)', g's "x" is a Return(f, &).
+	// The type of x can be queried from the function.
+	Return(Rc<Function>, ScalarOp),
+	// e.g. in 'int x; f(x);', "x" is a Free("x", int, GenI32)
+	Free(String, Box<Generator>, ScalarOp),
+	// e.g. in f(&y); g(y)', g's "y" is Parent(y, _)., where y is a Free(...)
+	Parent(Rc<Source>, ScalarOp),
 }
 
-// Details where a value is used: which parameter of which function.
-pub enum Use {
-	Nil, // isn't used.
-	Argument(Function, usize), // function + parameter index it comes from
+// A variable has a root type, but when used in functions it may need to be
+// transformed in some way.  The classic example is a stack variable that needs
+// address-of to be passed to a method that accepts it by pointer.
+#[derive(Clone)]
+pub enum ScalarOp {
+	Null, // no transformation needed
+	Deref, // dereference it once
+	AddressOf, // apply the address-of operator
 }
-
-// Free is a container for all of the variable information.
-pub trait Free {
-	fn typename(&self) -> String;
-	fn name(&self) -> String;
-	// Generate a C expression that could be used in initializing a value of this
-	// variable.
-	fn value(&self) -> String;
-}
-
-// A dependent variable is a variable that we don't actually have control over.
-// For example, if the API model states that 'the return value of f() must be
-// the second argument of g()', a la:
-//   type v = f();
-//   g(_, v);
-// Then 'v' is dependent.  The effect is mostly that we don't attach a
-// Generator to it.
-pub struct Dependent {
-	pub name: String,
-	pub src: Source,
-	pub dest: Use,
-	pub ty: Type,
+impl ToString for ScalarOp {
+	fn to_string(&self) -> String {
+		match self {
+			&ScalarOp::Null => "".to_string(),
+			&ScalarOp::Deref => "*".to_string(),
+			&ScalarOp::AddressOf => "&".to_string(),
+		}
+	}
 }
 
 // A Generator holds TypeClass information and helps us iterate through the
@@ -55,12 +50,17 @@ pub trait Generator {
 	fn n_state(&self) -> usize;
 }
 
-pub fn create(t: &Type) -> Box<Generator> {
+// There are special cases if you want to constrain the generator in some way.
+// But if any value of that type will be fine, then you can just use this
+// 'generator' method to get the most generic Generator for the given type.
+pub fn generator(t: &Type) -> Box<Generator> {
 	match t {
 		&Type::Enum(_, _) => Box::new(GenEnum::create(t)),
 		&Type::I32 => Box::new(GenI32::create(t)),
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
-		&Type::Field(_, ref x) => create(x),
+		&Type::Field(_, ref x) => generator(x),
+		&Type::Usize => Box::new(GenUsize::create(t)),
+		&Type::UDT(_, ref flds) => Box::new(GenUDT::create(t)),
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
 }
@@ -119,6 +119,32 @@ impl Generator for GenI32 {
 	}
 }
 
+pub struct GenUsize {
+	cls: TC_Usize,
+	idx: usize,
+}
+
+impl GenUsize {
+	pub fn create(_: &Type) -> Self {
+		GenUsize{ cls: TC_Usize::new(), idx: 0 }
+	}
+}
+
+impl Generator for GenUsize {
+	fn get(&self) -> String {
+		return self.cls.value(self.idx).to_string();
+	}
+	fn next(&mut self) {
+		if self.idx < self.cls.n()-1 {
+			self.idx = self.idx + 1
+		}
+	}
+
+	fn n_state(&self) -> usize {
+		return self.cls.n();
+	}
+}
+
 pub struct GenUDT {
 	types: Vec<Type>,
 	values: Vec<Box<Generator>>,
@@ -136,7 +162,7 @@ impl GenUDT {
 		// create an appropriate value for every possible type.
 		let mut val: Vec<Box<Generator>> = Vec::new();
 		for x in tys.iter() {
-			let v = create(&x);
+			let v = generator(&x);
 			val.push(v);
 		}
 		let nval: usize = val.len();
@@ -154,6 +180,7 @@ impl Generator for GenUDT {
 	fn get(&self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
+
 		write!(&mut rv, "{{\n").unwrap();
 
 		for i in 0..self.values.len() {
@@ -215,50 +242,4 @@ impl Generator for GenPointer {
 			self.idx = self.idx + 1
 		}
 	}
-}
-
-//---------------------------------------------------------------------
-
-pub struct FreeEnum {
-	pub name: String,
-	pub tested: GenEnum,
-	pub dest: Use,
-	pub ty: Type,
-}
-
-impl Free for FreeEnum {
-	fn typename(&self) -> String { return self.ty.name(); }
-	fn name(&self) -> String { return self.name.clone(); }
-	fn value(&self) -> String {
-		return self.tested.get();
-	}
-}
-
-#[allow(dead_code)]
-pub struct FreeI32 {
-	pub name: String,
-	pub tested: GenI32,
-	pub dest: Use,
-	pub ty: Type,
-}
-
-impl Free for FreeI32 {
-	fn typename(&self) -> String { return self.ty.name(); }
-	fn name(&self) -> String { return self.name.clone(); }
-	fn value(&self) -> String {
-		return self.tested.get();
-	}
-}
-
-pub struct FreeUDT {
-	pub name: String,
-	pub tested: GenUDT,
-	pub dest: Use,
-	pub ty: Type,
-}
-
-impl Free for FreeUDT {
-	fn typename(&self) -> String { return self.ty.name(); }
-	fn name(&self) -> String { return self.name.clone(); }
-	fn value(&self) -> String { self.tested.get() }
 }
