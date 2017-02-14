@@ -3,8 +3,6 @@ use std::collections::btree_map::BTreeMap;
 use std::fs::File;
 use std::process::Command;
 extern crate rand;
-mod bitvector;
-mod bloom;
 mod function;
 mod tc;
 mod typ;
