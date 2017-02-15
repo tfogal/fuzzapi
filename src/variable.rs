@@ -3,6 +3,7 @@
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
+use std::cell::RefCell;
 use std::rc::Rc;
 use function::*;
 use typ::*;
@@ -19,6 +20,61 @@ pub enum Source {
 	Free(String, Box<Generator>, ScalarOp),
 	// e.g. in f(&y); g(y)', g's "y" is Parent(y, _)., where y is a Free(...)
 	Parent(Rc<Source>, ScalarOp),
+}
+
+pub struct Src {
+	name: String,
+	generator: Box<Generator>,
+	op: ScalarOp,
+	// There is only ever one parent and/or function.  However we need to store
+	// them in vectors because Rust is annoying and doesn't let us create an
+	// "empty" RefCell.
+	parent: Vec<Rc<RefCell<Src>>>,
+	fqn: Vec<Rc<Function>>,
+}
+impl Src {
+	fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Src>> {
+		Rc::new(RefCell::new(Src{
+			name: nm.to_string(), generator: generator(ty), op: o,
+			parent: Vec::new(),
+			fqn: Vec::new(),
+		}))
+	}
+	fn is_free(&self) -> bool {
+		return self.name.len() == 0;
+	}
+
+	fn bound(parent: Rc<RefCell<Src>>, o: ScalarOp) -> Rc<RefCell<Src>> {
+		Rc::new(RefCell::new(Src{
+			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
+			parent: vec![parent],
+			fqn: Vec::new(),
+		}))
+	}
+	fn is_bound(&self) -> bool {
+		return self.parent.len() == 1;
+	}
+
+	fn retval(fqn: Rc<Function>, oper: ScalarOp) -> Rc<RefCell<Src>> {
+		Rc::new(RefCell::new(Src{
+			name: "".to_string(), generator: Box::new(GenNothing{}), op: oper,
+			parent: Vec::new(),
+			fqn: vec![fqn],
+		}))
+	}
+	fn is_retval(&self) -> bool {
+		return self.fqn.len() == 1;
+	}
+}
+
+impl Name for Src {
+	fn name(&self) -> String {
+		if self.is_free() { return self.name.clone(); }
+		if self.is_bound() { return self.parent[0].borrow().name(); }
+		if self.is_retval() { return self.fqn[0].name.clone(); }
+		unreachable!();
+		return "SRC_NAME_METHOD_BROKEN!!".to_string();
+	}
 }
 
 impl Name for Source {
@@ -76,6 +132,16 @@ pub fn generator(t: &Type) -> Box<Generator> {
 }
 
 //---------------------------------------------------------------------
+
+// The generator attached to a Src will only be called if the source is a free
+// variable.  Yet all Srcs require a generator to be given.
+// Thus it is useful to have this "dummy" generator that just does nothing.
+pub struct GenNothing {}
+impl Generator for GenNothing {
+	fn get(&self) -> String { return "".to_string(); }
+	fn next(&mut self) {}
+	fn n_state(&self) -> usize { 0 }
+}
 
 pub struct GenEnum {
 	cls: TC_Enum,
