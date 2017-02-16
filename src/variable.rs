@@ -9,9 +9,7 @@ use function::*;
 use typ::*;
 use tc::*;
 
-// A variable Source is either the return value of a function, a "parent"
-// (variable that was passed to another function, earlier), or "Free" in the
-// sense that we can choose its value.
+/*
 pub enum Source {
 	// e.g. in 'x = f(); g(&x)', g's "x" is a Return(f, &).
 	// The type of x can be queried from the function.
@@ -21,76 +19,70 @@ pub enum Source {
 	// e.g. in f(&y); g(y)', g's "y" is Parent(y, _)., where y is a Free(...)
 	Parent(Rc<Source>, ScalarOp),
 }
+*/
 
-pub struct Src {
+#[derive(Debug)]
+pub struct Source {
 	name: String,
-	generator: Box<Generator>,
-	op: ScalarOp,
+	pub generator: Box<Generator>,
+	pub op: ScalarOp,
 	// There is only ever one parent and/or function.  However we need to store
 	// them in vectors because Rust is annoying and doesn't let us create an
 	// "empty" RefCell.
-	parent: Vec<Rc<RefCell<Src>>>,
+	pub parent: Vec<Rc<RefCell<Source>>>,
 	fqn: Vec<Rc<Function>>,
 }
-impl Src {
-	fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Src>> {
-		Rc::new(RefCell::new(Src{
+impl Source {
+	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
+		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: generator(ty), op: o,
 			parent: Vec::new(),
 			fqn: Vec::new(),
 		}))
 	}
-	fn is_free(&self) -> bool {
-		return self.name.len() == 0;
+	pub fn is_free(&self) -> bool {
+		return self.name.len() != 0;
 	}
 
-	fn bound(parent: Rc<RefCell<Src>>, o: ScalarOp) -> Rc<RefCell<Src>> {
-		Rc::new(RefCell::new(Src{
+	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) -> Rc<RefCell<Source>> {
+		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
 			parent: vec![parent],
 			fqn: Vec::new(),
 		}))
 	}
-	fn is_bound(&self) -> bool {
+	pub fn is_bound(&self) -> bool {
 		return self.parent.len() == 1;
 	}
 
-	fn retval(fqn: Rc<Function>, oper: ScalarOp) -> Rc<RefCell<Src>> {
-		Rc::new(RefCell::new(Src{
+/*
+	pub fn retval(fqn: Rc<Function>, oper: ScalarOp) -> Rc<RefCell<Source>> {
+		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: oper,
 			parent: Vec::new(),
 			fqn: vec![fqn],
 		}))
 	}
-	fn is_retval(&self) -> bool {
+*/
+	pub fn is_retval(&self) -> bool {
 		return self.fqn.len() == 1;
-	}
-}
-
-impl Name for Src {
-	fn name(&self) -> String {
-		if self.is_free() { return self.name.clone(); }
-		if self.is_bound() { return self.parent[0].borrow().name(); }
-		if self.is_retval() { return self.fqn[0].name.clone(); }
-		unreachable!();
-		return "SRC_NAME_METHOD_BROKEN!!".to_string();
 	}
 }
 
 impl Name for Source {
 	fn name(&self) -> String {
-		match self {
-			&Source::Return(ref fqn, _) => return fqn.name.clone(),
-			&Source::Free(ref nm, _, _) => return nm.clone(),
-			&Source::Parent(ref src, _) => return src.name(),
-		}
+		if self.is_free() { return self.name.clone(); }
+		if self.is_bound() { return self.parent[0].borrow().name(); }
+		if self.is_retval() { return self.fqn[0].name.clone(); }
+		println!("invalid source: {:?}", self);
+		unreachable!();
 	}
 }
 
 // A variable has a root type, but when used in functions it may need to be
 // transformed in some way.  The classic example is a stack variable that needs
 // address-of to be passed to a method that accepts it by pointer.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ScalarOp {
 	Null, // no transformation needed
 	Deref, // dereference it once
@@ -114,6 +106,15 @@ pub trait Generator {
 	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
 	fn n_state(&self) -> usize;
+	// Sets the state back to 0.
+	fn reset(&mut self);
+}
+
+use std::fmt;
+impl fmt::Debug for Box<Generator> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "gener{{}}")
+	}
 }
 
 // There are special cases if you want to constrain the generator in some way.
@@ -127,20 +128,28 @@ pub fn generator(t: &Type) -> Box<Generator> {
 		&Type::Field(_, ref x) => generator(x),
 		&Type::Usize => Box::new(GenUsize::create(t)),
 		&Type::UDT(_, _) => Box::new(GenUDT::create(t)),
+		&Type::Integer => {
+			println!("WARNING: using I32 generator for integer!");
+			Box::new(GenI32::create(t))
+		}
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
 }
 
 //---------------------------------------------------------------------
 
-// The generator attached to a Src will only be called if the source is a free
-// variable.  Yet all Srcs require a generator to be given.
-// Thus it is useful to have this "dummy" generator that just does nothing.
+// The generator attached to a Source will only be called if the source is a free
+// variable.  Yet all Sources require a generator to be given.
+// This source just panics if you call it, because you should never call it.
 pub struct GenNothing {}
+// Maybe it's useful to have it pretend it's a 0-state thing that's always at
+// the end?  Then we could do things like sum up all n_state()s in the tree of
+// functions and have it make sense ...
 impl Generator for GenNothing {
-	fn get(&self) -> String { return "".to_string(); }
-	fn next(&mut self) {}
-	fn n_state(&self) -> usize { 0 }
+	fn get(&self) -> String { panic!("Null generator called"); }
+	fn next(&mut self) { panic!("Null generator can't advance"); }
+	fn n_state(&self) -> usize { panic!("Null generator has no states."); }
+	fn reset(&mut self) { panic!("Null generator cannot be reset"); }
 }
 
 pub struct GenEnum {
@@ -167,6 +176,8 @@ impl Generator for GenEnum {
 	fn n_state(&self) -> usize {
 		return self.cls.n();
 	}
+
+	fn reset(&mut self) { self.idx = 0; }
 }
 
 pub struct GenI32 {
@@ -193,6 +204,8 @@ impl Generator for GenI32 {
 	fn n_state(&self) -> usize {
 		return self.cls.n();
 	}
+
+	fn reset(&mut self) { self.idx = 0; }
 }
 
 pub struct GenUsize {
@@ -219,6 +232,8 @@ impl Generator for GenUsize {
 	fn n_state(&self) -> usize {
 		return self.cls.n();
 	}
+
+	fn reset(&mut self) { self.idx = 0; }
 }
 
 pub struct GenUDT {
@@ -296,6 +311,12 @@ impl Generator for GenUDT {
 			self.idx[i] = v.n_state()
 		}
 	}
+
+	fn reset(&mut self) {
+		for i in 0..self.idx.len() {
+			self.idx[i] = 0;
+		}
+	}
 }
 
 pub struct GenPointer {
@@ -318,4 +339,5 @@ impl Generator for GenPointer {
 			self.idx = self.idx + 1
 		}
 	}
+	fn reset(&mut self) { self.idx = 0; }
 }

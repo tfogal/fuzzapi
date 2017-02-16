@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::collections::btree_map::BTreeMap;
 use std::fs::File;
 use std::process::Command;
@@ -19,10 +18,10 @@ macro_rules! tryp {
 #[allow(dead_code)]
 fn prototypes(strm: &mut std::io::Write, functions: &Vec<Function>) {
 	for fqn in functions.iter() {
-		let (ref ty, _) = fqn.return_type;
+		let ref ty = fqn.return_type.ty;
 		tryp!(write!(strm, "extern {} {}(", ty.name(), fqn.name));
 		for a in 0..fqn.arguments.len() {
-			let (ref argtype, _) = fqn.arguments[a];
+			let ref argtype = fqn.arguments[a].ty;
 			tryp!(write!(strm, "{}", argtype.name()));
 			if a != fqn.arguments.len()-1 {
 				tryp!(write!(strm, ", "));
@@ -49,23 +48,28 @@ fn rvalue(src: &variable::Source) -> String {
 	use std::fmt::Write;
 	let mut rv = String::new();
 
-	match src {
-		&variable::Source::Free(ref nm, _, ref op) => {
-			tryp!(write!(rv, "{}{}", op.to_string(), nm));
-		},
-		&variable::Source::Return(_, _) => {
-			tryp!(write!(rv, "/*fixme, from ret*/"));
-		},
-		&variable::Source::Parent(ref spar, _) => {
-			// should we be prepending the ScalarOp to whatever the recursion gives?
-			return rvalue(spar);
-		},
+	if src.is_free() {
+		tryp!(write!(rv, "{}{}", src.op.to_string(), src.name()));
+	} else if src.is_bound() {
+		/* should we prepend scalar op? */
+		use std::ops::Deref;
+		return rvalue(src.parent[0].borrow().deref());
+	} else if src.is_retval() {
+		tryp!(write!(rv, "/*fixme, from ret*/"));
 	}
 	return rv;
 }
 
-fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) ->
-	std::io::Result<()> {
+fn reset_args(fqn: &mut Function) {
+	use std::ops::DerefMut;
+	for arg in fqn.arguments.iter() {
+		if arg.src.borrow().is_free() {
+			arg.src.borrow_mut().generator.deref_mut().reset();
+		}
+	}
+}
+
+fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) -> std::io::Result<()> {
 	let hdrs: Vec<&str> = vec!["search.h"];
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
@@ -81,20 +85,18 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) ->
 	for fqn in fqns {
 		// declare all variables used as arguments to the function
 		for ref arg in fqn.arguments.iter() {
-			let &(ref argtype, ref src) = *arg;
-			match src.deref() {
-				&variable::Source::Free(ref nm, ref gen, _) => {
-					try!(writeln!(strm, "\t{} {} = {};", argtype.name(), nm, gen.get()));
-				},
-				_ => {} // all vars eventually come from a free
-			}
+			//let &(ref argtype, ref src) = *arg;
+			if arg.src.borrow().is_free() {
+				try!(writeln!(strm, "\t{} {} = {};", arg.ty.name(), arg.src.borrow().name(),
+				              arg.src.borrow().generator.get()));
+			} // no else: all vars eventually come from a free
 		};
-		let (ref rettype, ref src) = fqn.return_type;
-		try!(write!(strm, "\t{} {} = {}(", rettype.name(), src.name(), fqn.name));
+		let ref ret = fqn.return_type;
+		try!(write!(strm, "\t{} {} = {}(", ret.ty.name(), ret.src.borrow().name(), fqn.name));
 
 		for (a, ref arg) in fqn.arguments.iter().enumerate() {
-			let &(_, ref src) = *arg;
-			try!(write!(strm, "{}", rvalue(src.deref())));
+			//let &(_, ref src) = *arg;
+			try!(write!(strm, "{}", rvalue(arg.src.deref().borrow().deref())));
 			if a < fqn.arguments.len()-1 {
 				try!(write!(strm, ", "));
 			}
@@ -167,53 +169,33 @@ fn main() {
 	let fname: &'static str = "/tmp/fuzziter.c";
 	{
 		use variable::ScalarOp;
-		let nel = variable::Source::Free("nel".to_string(),
-		                                 variable::generator(&Type::Usize),
-		                                 ScalarOp::Null);
-		let hsd_var = Rc::new(
-			variable::Source::Free("tbl".to_string(), variable::generator(&hs_data),
-			                       ScalarOp::AddressOf)
-		);
-		let fa1: function::Argument = (Type::Usize, Rc::new(nel));
-		let fa2: function::Argument = (hs_data.clone(), hsd_var.clone());
+		let nel = variable::Source::free("nel", &Type::Usize, ScalarOp::Null);
+		let hsd_var = variable::Source::free("tbl", &hs_data, ScalarOp::AddressOf);
+		let fa1 = Argument::new(&Type::Usize, nel);
+		let fa2 = Argument::new(&hs_data, hsd_var.clone());
 		let hcreate_args = vec![fa1, fa2];
 
-		let hc_retval = variable::Source::Free("crterr".to_string(),
-		                                       variable::generator(&Type::I32),
+		let hc_retval = variable::Source::free("crterr", &Type::I32,
 		                                       ScalarOp::Null);
-		let hcreate = function::Function{
-			return_type: (Type::Integer, Rc::new(hc_retval)),
-			arguments: hcreate_args,
-		  name: "hcreate_r".to_string(),
-		};
+		let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
+		let hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
 //                     struct hsearch_data *htab);
-		let item = variable::Source::Free("item".to_string(),
-		                                  variable::generator(&entry.clone()),
-		                                  ScalarOp::Null);
-		let actvar = variable::Source::Free("action".to_string(),
-		                                    variable::generator(&action),
-		                                    ScalarOp::Null);
+		let item = variable::Source::free("item", &entry.clone(), ScalarOp::Null);
+		let actvar = variable::Source::free("action", &action, ScalarOp::Null);
 		let entryp = Type::Pointer(Box::new(entry.clone()));
-		let rv = variable::Source::Free("retval".to_string(),
-		                                variable::generator(&entryp),
-		                                ScalarOp::AddressOf);
-		let htab = variable::Source::Parent(hsd_var.clone(), ScalarOp::AddressOf);
+		let rv = variable::Source::free("retval", &entryp, ScalarOp::AddressOf);
+		let htab = variable::Source::bound(hsd_var.clone(), ScalarOp::AddressOf);
 		let hsearch_r_args = vec![
-			(entry, Rc::new(item)),
-			(action, Rc::new(actvar)),
-			(entryp, Rc::new(rv)),
-			(hs_data_ptr.clone(), Rc::new(htab)),
+			Argument::new(&entry, item),
+			Argument::new(&action, actvar),
+			Argument::new(&entryp, rv),
+			Argument::new(&hs_data_ptr, htab),
 		];
-		let hs_rv = variable::Source::Free("hserr".to_string(),
-		                                   variable::generator(&Type::I32),
-		                                   ScalarOp::Null);
-		let hsearch = function::Function{
-			return_type: (Type::Integer, Rc::new(hs_rv)),
-			arguments: hsearch_r_args,
-			name: "hsearch_r".to_string(),
-		};
+		let hs_rv = variable::Source::free("hserr", &Type::Integer, ScalarOp::Null);
+		let hsearch = Function::new("hsearch_r",
+			&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
 
 		let mut newtest = match File::create(fname) {
 			Err(e) => {
