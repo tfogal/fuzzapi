@@ -105,6 +105,8 @@ pub trait Generator {
 	fn get(&self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
+	/// At the end state?
+	fn done(&self) -> bool;
 	fn n_state(&self) -> usize;
 	// Sets the state back to 0.
 	fn reset(&mut self);
@@ -148,6 +150,7 @@ pub struct GenNothing {}
 impl Generator for GenNothing {
 	fn get(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
+	fn done(&self) -> bool { panic!("Null generator is always finished."); }
 	fn n_state(&self) -> usize { panic!("Null generator has no states."); }
 	fn reset(&mut self) { panic!("Null generator cannot be reset"); }
 }
@@ -171,6 +174,9 @@ impl Generator for GenEnum {
 		if self.idx < self.cls.n()-1 {
 			self.idx = self.idx + 1;
 		}
+	}
+	fn done(&self) -> bool {
+		return self.idx >= self.cls.n()-1;
 	}
 
 	fn n_state(&self) -> usize {
@@ -200,6 +206,9 @@ impl Generator for GenI32 {
 			self.idx = self.idx + 1
 		}
 	}
+	fn done(&self) -> bool {
+		return self.idx >= self.cls.n()-1;
+	}
 
 	fn n_state(&self) -> usize {
 		return self.cls.n();
@@ -227,6 +236,9 @@ impl Generator for GenUsize {
 		if self.idx < self.cls.n()-1 {
 			self.idx = self.idx + 1
 		}
+	}
+	fn done(&self) -> bool {
+		return self.idx >= self.cls.n()-1;
 	}
 
 	fn n_state(&self) -> usize {
@@ -311,6 +323,9 @@ impl Generator for GenUDT {
 			self.idx[i] = v.n_state()
 		}
 	}
+	fn done(&self) -> bool {
+		self.values.iter().all(|v| v.done())
+	}
 
 	fn reset(&mut self) {
 		for i in 0..self.idx.len() {
@@ -339,5 +354,6 @@ impl Generator for GenPointer {
 			self.idx = self.idx + 1
 		}
 	}
+	fn done(&self) -> bool { return self.idx >= self.cls.n()-1; }
 	fn reset(&mut self) { self.idx = 0; }
 }
