@@ -69,7 +69,23 @@ fn reset_args(fqn: &mut Function) {
 	}
 }
 
-fn gen(strm: &mut std::io::Write, fqns: &Vec<Function>) -> std::io::Result<()> {
+fn fqnfinished(func: &Function) -> bool {
+	if func.arguments.iter().all( // all ...
+		|ref a| a.src.borrow().generator.done() // ... done
+	) {
+		return true;
+	}
+	return false;
+}
+
+fn finished(functions: &Vec<&Function>) -> bool {
+	if functions.iter().all(|ref f| fqnfinished(f)) {
+		return true;
+	}
+	return false;
+}
+
+fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()> {
 	let hdrs: Vec<&str> = vec!["search.h"];
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
@@ -178,7 +194,7 @@ fn main() {
 		let hc_retval = variable::Source::free("crterr", &Type::I32,
 		                                       ScalarOp::Null);
 		let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
-		let hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
+		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
 //                     struct hsearch_data *htab);
@@ -194,7 +210,7 @@ fn main() {
 			Argument::new(&hs_data_ptr, htab),
 		];
 		let hs_rv = variable::Source::free("hserr", &Type::Integer, ScalarOp::Null);
-		let hsearch = Function::new("hsearch_r",
+		let mut hsearch = Function::new("hsearch_r",
 			&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
 
 		let mut newtest = match File::create(fname) {
@@ -204,7 +220,13 @@ fn main() {
 			},
 			Ok(x) => x,
 		};
-		match gen(&mut newtest, &vec![hcreate, hsearch]) {
+		{
+		let mut functions: Vec<&mut Function> = vec![&mut hcreate, &mut hsearch];
+		}
+		// We can't just use our vector of mutable functions because vectors of
+		// mutable things can't coerce to vectors of immutable things.  Really.
+		let hate_rust: Vec<&Function> = vec![&hcreate, &hsearch];
+		match gen(&mut newtest, &hate_rust) {
 			Err(x) => panic!(x),
 			Ok(_) => {},
 		};
