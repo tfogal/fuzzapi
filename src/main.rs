@@ -362,4 +362,10 @@ fn main() {
 		};
 		next(&mut functions);
 	}
+	// We next()ed, but then our iteration is finished() before we actually
+	// compile_and_test()ed the resultant state.  Test that last state.
+	match compile_and_test(&mut functions) {
+		Err(e) => panic!("compile/test error: {}", e),
+		Ok(_) => {},
+	};
 }
