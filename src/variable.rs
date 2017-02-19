@@ -292,7 +292,10 @@ impl GenUsize {
 
 impl Generator for GenUsize {
 	fn get(&self) -> String {
-		return self.cls.value(self.idx).to_string();
+		let mut rv = String::new();
+		use std::fmt::Write;
+		write!(&mut rv, "{}ull", self.cls.value(self.idx).to_string()).unwrap();
+		return rv;
 	}
 	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
