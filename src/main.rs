@@ -1,5 +1,6 @@
 use std::collections::btree_map::BTreeMap;
 use std::fs::File;
+use std::mem;
 use std::process::Command;
 extern crate rand;
 mod function;
@@ -82,10 +83,83 @@ fn finished(functions: &Vec<&Function>) -> bool {
 	if functions.iter().all(|ref f| fqnfinished(f)) {
 		return true;
 	}
+	println!("FIXME: should check the return value here too");
 	return false;
 }
 
-fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()> {
+fn fqnnext(func: &mut Function) {
+	assert!(!fqnfinished(func));
+	let nxt = match func.arguments.iter().rposition(|ref a| {
+		!a.src.borrow().generator.done()
+	}) {
+		None => { // Then try to iterate the return value
+			if func.return_type.src.borrow().generator.done() {
+				// All arguments and return value are done?  That implies that this
+				// function is finished; how did we get here?
+				unreachable!();
+			}
+			println!("next retval!");
+			func.return_type.src.borrow_mut().generator.next();
+			return;
+		},
+		Some(idx) => idx,
+	};
+	if func.arguments[nxt].src.borrow().generator.done() {
+		panic!("fqn:{}.{} [next={}] is already done?", func.name,
+		       func.arguments[nxt].src.borrow().name(), nxt);
+	}
+	func.arguments[nxt].src.borrow_mut().generator.next();
+
+	// reset all subsequent arguments.
+	for idx in nxt+1..func.arguments.len() {
+		func.arguments[idx].src.borrow_mut().generator.reset();
+	}
+}
+
+fn next(functions: &mut Vec<&mut Function>) {
+	{
+		let immut = unsafe {
+			mem::transmute::<&Vec<&mut Function>, &Vec<&Function>>(functions)
+		};
+		assert!(!finished(&immut));
+	}
+
+	// find the right-most iterator that is not finished ...
+	let nxt = match functions.iter().rposition(|ref f| !fqnfinished(&f)) {
+		None => unreachable!(),
+		Some(idx) => idx,
+	};
+	fqnnext(&mut functions[nxt]); // ... advance that function ...
+	// ... and reset all the functions after that.
+	for idx in nxt+1..functions.len() {
+		reset_args(&mut functions[idx]);
+	}
+}
+
+// This is mostly used for testing.
+#[allow(dead_code)]
+fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
+	for fqn in fqns {
+		tryp!(write!(strm, "{:?} = {}(", fqn.return_type.src.borrow().generator,
+		             fqn.name));
+		for (a, arg) in fqn.arguments.iter().enumerate() {
+			if arg.src.borrow().is_free() {
+				tryp!(write!(strm, "{:?}", arg.src.borrow().generator));
+			} else if arg.src.borrow().is_bound() {
+				tryp!(write!(strm, "(bound)"));
+			} else if arg.src.borrow().is_retval() {
+				tryp!(write!(strm, "(rv)"));
+			}
+			if a != fqn.arguments.len()-1 {
+				tryp!(write!(strm, ", "));
+			}
+		}
+		tryp!(writeln!(strm, ")"));
+	}
+}
+
+fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
+{
 	let hdrs: Vec<&str> = vec!["search.h"];
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
@@ -120,6 +194,7 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()> 
 		try!(writeln!(strm, ");"));
 	}
 
+	try!(writeln!(strm, "\n\treturn 0;"));
 	try!(writeln!(strm, "}}"));
 	return Ok(());
 }
@@ -141,7 +216,6 @@ fn system(cmd: String) -> Result<(), std::io::Error> {
 }
 
 fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
-	// todo/fixme: don't hardcode arguments, read from config file or similar.
 	let mut cmd = Command::new("gcc");
 	for flg in flags.iter() {
 		cmd.arg(flg);
@@ -149,6 +223,7 @@ fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 	cmd.arg("-o");
 	cmd.arg(dest);
 	cmd.arg(src);
+
 	let compile = match cmd.output() {
 		Err(e) => {
 			use std::fmt;
@@ -157,6 +232,14 @@ fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 		},
 		Ok(x) => x,
 	};
+
+	let err = String::from_utf8(compile.stderr).unwrap();
+	if err.len() > 0 && !compile.status.success() {
+		use std::fmt;
+		return Err(fmt::format(format_args!("compilation of {} failed: {}",
+		                                    src, err)));
+	}
+
 	let comps: String = String::from_utf8(compile.stdout).unwrap();
 	if comps.len() > 0 {
 		println!("gcc output: '{}'", comps);
@@ -166,6 +249,44 @@ fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 		Err(e) => return Err(format!("err: {}", e)),
 		Ok(_) => return Ok(()),
 	}
+}
+
+fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
+	use std::fmt;
+
+	let fname: &'static str = "/tmp/fuzziter.c";
+	let mut newtest = match File::create(fname) {
+		Err(e) => {
+			println!("Could not create {}: {}", fname, e); /* FIXME stderr */
+			return Err(fmt::format(format_args!("creating {}: {}", fname, e)));
+		},
+		Ok(x) => x,
+	};
+
+	let immut = unsafe {
+		// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
+		mem::transmute::<&Vec<&mut Function>,&Vec<&Function>>(&api)
+	};
+	match gen(&mut newtest, immut) {
+		Err(x) => return Err(fmt::format(format_args!("gen: {}", x))),
+		Ok(_) => {},
+	};
+
+	let outname: &'static str = ".fuzziter";
+	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
+									"-D_GNU_SOURCE"];
+	match compile(fname, outname, &args) {
+		Err(x) => return Err(x),
+		Ok(_) => {},
+	};
+
+	let cmdname: String = String::from("./") + String::from(outname).as_str();
+	if system(cmdname).is_err() {
+		use std::io::Write;
+		writeln!(&mut std::io::stderr(), "Bug found, exiting.").unwrap();
+		std::process::exit(1);
+	}
+	return Ok(());
 }
 
 fn main() {
@@ -182,64 +303,49 @@ fn main() {
 	action_values.insert("ENTER".to_string(), 1);
 	let action = Type::Enum("ACTION".to_string(), action_values);
 
-	let fname: &'static str = "/tmp/fuzziter.c";
-	{
-		use variable::ScalarOp;
-		let nel = variable::Source::free("nel", &Type::Usize, ScalarOp::Null);
-		let hsd_var = variable::Source::free("tbl", &hs_data, ScalarOp::AddressOf);
-		let fa1 = Argument::new(&Type::Usize, nel);
-		let fa2 = Argument::new(&hs_data, hsd_var.clone());
-		let hcreate_args = vec![fa1, fa2];
+	use variable::ScalarOp;
+	let nel = variable::Source::free("nel", &Type::Usize, ScalarOp::Null);
+	let hsd_var = variable::Source::free_gen("tbl",
+		Box::new(variable::GenOpaque::create(&hs_data_ptr)), ScalarOp::AddressOf
+	);
+	let fa1 = Argument::new(&Type::Usize, nel);
+	let fa2 = Argument::new(&hs_data, hsd_var.clone());
+	let hcreate_args = vec![fa1, fa2];
 
-		let hc_retval = variable::Source::free("crterr", &Type::I32,
-		                                       ScalarOp::Null);
-		let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
-		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
+	let hc_retval = variable::Source::free("crterr", &Type::I32,
+																				 ScalarOp::Null);
+	let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
+	let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
 //                     struct hsearch_data *htab);
-		let item = variable::Source::free("item", &entry.clone(), ScalarOp::Null);
-		let actvar = variable::Source::free("action", &action, ScalarOp::Null);
-		let entryp = Type::Pointer(Box::new(entry.clone()));
-		let rv = variable::Source::free("retval", &entryp, ScalarOp::AddressOf);
-		let htab = variable::Source::bound(hsd_var.clone(), ScalarOp::AddressOf);
-		let hsearch_r_args = vec![
-			Argument::new(&entry, item),
-			Argument::new(&action, actvar),
-			Argument::new(&entryp, rv),
-			Argument::new(&hs_data_ptr, htab),
-		];
-		let hs_rv = variable::Source::free("hserr", &Type::Integer, ScalarOp::Null);
-		let mut hsearch = Function::new("hsearch_r",
-			&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
+	let item = variable::Source::free("item", &entry.clone(), ScalarOp::Null);
+	let actvar = variable::Source::free("action", &action, ScalarOp::Null);
+	let entryp = Type::Pointer(Box::new(entry.clone()));
+	let rv = variable::Source::free("retval", &entryp, ScalarOp::AddressOf);
+	let htab = variable::Source::bound(hsd_var.clone(), ScalarOp::AddressOf);
+	let hsearch_r_args = vec![
+		Argument::new(&entry, item),
+		Argument::new(&action, actvar),
+		Argument::new(&entryp, rv),
+		Argument::new(&hs_data_ptr, htab),
+	];
+	let hs_rv = variable::Source::free("hserr", &Type::Integer, ScalarOp::Null);
+	let mut hsearch = Function::new("hsearch_r",
+		&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
 
-		let mut newtest = match File::create(fname) {
-			Err(e) => {
-				println!("Could not create {}: {}", fname, e); /* FIXME stderr */
-				std::process::exit(1);
-			},
-			Ok(x) => x,
-		};
-		{
-		let mut functions: Vec<&mut Function> = vec![&mut hcreate, &mut hsearch];
-		}
-		// We can't just use our vector of mutable functions because vectors of
-		// mutable things can't coerce to vectors of immutable things.  Really.
-		let hate_rust: Vec<&Function> = vec![&hcreate, &hsearch];
-		match gen(&mut newtest, &hate_rust) {
-			Err(x) => panic!(x),
+	let mut functions: Vec<&mut Function> = vec![&mut hcreate, &mut hsearch];
+	let immut = unsafe {
+		// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
+		mem::transmute::<&Vec<&mut Function>,&Vec<&Function>>(&functions)
+	};
+	while !finished(&immut) {
+		//println!("--------- ITERATION {} --------", i);
+		//state(&mut std::io::stdout(), &immut);
+		match compile_and_test(&mut functions) {
+			Err(e) => panic!("compile/test error: {}", e),
 			Ok(_) => {},
 		};
-	}
-	let outname: &'static str = ".fuzziter";
-	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
-	                "-D_GNU_SOURCE"];
-	match compile(fname, outname, &args) {
-		Err(x) => panic!(x), Ok(_) => {},
-	};
-
-	let cmdname: String = String::from("./") + String::from(outname).as_str();
-	if system(cmdname).is_err() {
-		panic!("Might have found a bug, exiting ...");
+		next(&mut functions);
 	}
 }

@@ -39,17 +39,23 @@ pub trait TypeClass<T> {
 // parameters but baked into the type name.  Sigh.
 
 #[allow(non_camel_case_types, dead_code)]
+#[derive(Debug)]
 pub struct TC_U8 {}
 #[allow(non_camel_case_types, dead_code)]
+#[derive(Debug)]
 pub struct TC_U16 {}
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub struct TC_Usize {}
 /*...*/
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub struct TC_I32 {}
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub struct TC_Pointer {}
 #[allow(non_camel_case_types)]
+#[derive(Debug)]
 pub struct TC_Enum {
 	values: Vec<u32>
 }

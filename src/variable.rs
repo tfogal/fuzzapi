@@ -9,18 +9,6 @@ use function::*;
 use typ::*;
 use tc::*;
 
-/*
-pub enum Source {
-	// e.g. in 'x = f(); g(&x)', g's "x" is a Return(f, &).
-	// The type of x can be queried from the function.
-	Return(Rc<Function>, ScalarOp),
-	// e.g. in 'int x; f(x);', "x" is a Free("x", int, GenI32)
-	Free(String, Box<Generator>, ScalarOp),
-	// e.g. in f(&y); g(y)', g's "y" is Parent(y, _)., where y is a Free(...)
-	Parent(Rc<Source>, ScalarOp),
-}
-*/
-
 #[derive(Debug)]
 pub struct Source {
 	name: String,
@@ -33,9 +21,20 @@ pub struct Source {
 	fqn: Vec<Rc<Function>>,
 }
 impl Source {
+	// Construct a free variable of the given type that needs the given ScalarOp.
 	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: generator(ty), op: o,
+			parent: Vec::new(),
+			fqn: Vec::new(),
+		}))
+	}
+	// Similar construction, but this takes an explicit generator for when the
+	// default one for the type is inappropriate.
+	pub fn free_gen(nm: &str, gen: Box<Generator>, o: ScalarOp) ->
+		Rc<RefCell<Source>> {
+		Rc::new(RefCell::new(Source{
+			name: nm.to_string(), generator: gen, op: o,
 			parent: Vec::new(),
 			fqn: Vec::new(),
 		}))
@@ -110,12 +109,32 @@ pub trait Generator {
 	fn n_state(&self) -> usize;
 	// Sets the state back to 0.
 	fn reset(&mut self);
+
+	fn dbg(&self, &mut fmt::Formatter) -> fmt::Result;
 }
+
+/*
+fn tjffmt(f: &mut fmt::Formatter, generator: &Box<Generator>) -> fmt::Result {
+	if let Ok(gen) = generator.downcast::<GenEnum>() {
+		write!(f, "{:?}", gen)
+	} else {
+		write!(f, "gener{{}}")
+	}
+}
+*/
 
 use std::fmt;
 impl fmt::Debug for Box<Generator> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "gener{{}}")
+		self.dbg(f)
+//		write!(f, "{:?}", self.dbg(f))
+/*
+		if let Ok(gen) = Box::downcast::<Generator>(self) {
+			write!(f, "{:?}", gen)
+		} else {
+			write!(f, "gener{{}}")
+		}
+*/
 	}
 }
 
@@ -140,9 +159,11 @@ pub fn generator(t: &Type) -> Box<Generator> {
 
 //---------------------------------------------------------------------
 
-// The generator attached to a Source will only be called if the source is a free
-// variable.  Yet all Sources require a generator to be given.
-// This source just panics if you call it, because you should never call it.
+// The generator attached to a Source will only be called if the source is a
+// free variable.  Yet all Sources require a generator to be given.  So we use
+// this generator on non-free Sources.
+// It just panics if you call it, because you should never call it.
+#[derive(Debug)]
 pub struct GenNothing {}
 // Maybe it's useful to have it pretend it's a 0-state thing that's always at
 // the end?  Then we could do things like sum up all n_state()s in the tree of
@@ -150,11 +171,44 @@ pub struct GenNothing {}
 impl Generator for GenNothing {
 	fn get(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
-	fn done(&self) -> bool { panic!("Null generator is always finished."); }
+	fn done(&self) -> bool { return true; }
 	fn n_state(&self) -> usize { panic!("Null generator has no states."); }
-	fn reset(&mut self) { panic!("Null generator cannot be reset"); }
+	fn reset(&mut self) {}
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "(none)")
+	}
 }
 
+// Sometimes we have a "free" variable that is actually an opaque pointer and
+// will be initialized by some API.  In that case we really can't generate
+// values for it, so we use this special generator for it.
+#[derive(Debug)]
+pub struct GenOpaque {
+	ty: Type,
+}
+impl GenOpaque {
+	pub fn create(typ: &Type) -> Self {
+		GenOpaque{ty: typ.clone()}
+	}
+}
+
+impl Generator for GenOpaque {
+	fn get(&self) -> String {
+		let mut rv = String::new();
+		use std::fmt::Write;
+		write!(&mut rv, "/*({})*/{{}}", self.ty.name()).unwrap();
+		return rv;
+	}
+	fn next(&mut self) {}
+	fn done(&self) -> bool { return true; }
+	fn n_state(&self) -> usize { 0 }
+	fn reset(&mut self) {}
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "(opaque-none)")
+	}
+}
+
+#[derive(Debug)]
 pub struct GenEnum {
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
@@ -184,8 +238,12 @@ impl Generator for GenEnum {
 	}
 
 	fn reset(&mut self) { self.idx = 0; }
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "enum{{{} of {}}}", self.idx, self.cls.n())
+	}
 }
 
+#[derive(Debug)]
 pub struct GenI32 {
 	cls: TC_I32,
 	idx: usize,
@@ -215,8 +273,12 @@ impl Generator for GenI32 {
 	}
 
 	fn reset(&mut self) { self.idx = 0; }
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "i32{{{} of {}}}", self.idx, self.cls.n())
+	}
 }
 
+#[derive(Debug)]
 pub struct GenUsize {
 	cls: TC_Usize,
 	idx: usize,
@@ -246,8 +308,12 @@ impl Generator for GenUsize {
 	}
 
 	fn reset(&mut self) { self.idx = 0; }
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "usize{{{} of {}}}", self.idx, self.cls.n())
+	}
 }
 
+#[derive(Debug)]
 pub struct GenUDT {
 	types: Vec<Type>,
 	values: Vec<Box<Generator>>,
@@ -309,18 +375,14 @@ impl Generator for GenUDT {
 	// If we reset EVERY index, then we are actually at our end state and nothing
 	// changes.
 	fn next(&mut self) {
-		for (i, v) in self.values.iter().enumerate() {
-			if self.idx[i] < v.n_state()-1 {
-				self.idx[i] = self.idx[i] + 1;
-				return;
-			}
-			self.idx[i] = 0;
-		}
-		// if we got here, then we reset *everything*.  That means we were actually
-		// done, and now we just accidentally reset all the indices to the default
-		// state.  So here we re-reset them to the end state before returning.
-		for (i, v) in self.values.iter().enumerate() {
-			self.idx[i] = v.n_state()
+		let nxt = match self.values.iter().rposition(|ref v| !v.done()) {
+			None => /* already done.  just bail. */ { return; }
+			Some(idx) => idx,
+		};
+		assert!(!self.values[nxt].done());
+		self.values[nxt].next();
+		for idx in nxt+1..self.values.len() {
+			self.values[idx].reset();
 		}
 	}
 	fn done(&self) -> bool {
@@ -328,26 +390,42 @@ impl Generator for GenUDT {
 	}
 
 	fn reset(&mut self) {
-		for i in 0..self.idx.len() {
-			self.idx[i] = 0;
+		for v in 0..self.values.len() {
+			self.values[v].reset();
 		}
+	}
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		try!(write!(f, "udt{{"));
+		for (i, v) in self.values.iter().enumerate() {
+			try!(write!(f, "f{}:", i));
+			try!(v.dbg(f));
+			if i != self.values.len()-1 {
+				try!(write!(f, ", "));
+			}
+		}
+		write!(f, "}}")
 	}
 }
 
+#[derive(Debug)]
 pub struct GenPointer {
+	ty: Type,
 	cls: TC_Pointer,
 	idx: usize,
 }
 
 impl GenPointer {
-	pub fn create(_: &Type) -> Self {
-		// doesn't seem to be a good way to assert that t is a &Type::Pointer...
-		GenPointer{ cls: TC_Pointer::new(), idx: 0 }
+	pub fn create(t: &Type) -> Self {
+		match t {
+			&Type::Pointer(_) => {},
+			_ => panic!("asked to generate for non-pointer type {:?}", t),
+		};
+		GenPointer{ ty: t.clone(), cls: TC_Pointer::new(), idx: 0 }
 	}
 }
 
 impl Generator for GenPointer {
-	fn get(&self) -> String { self.cls.value(self.idx).to_string() }
+	fn get(&self) -> String { return self.cls.value(self.idx).to_string(); }
 	fn n_state(&self) -> usize { self.cls.n() }
 	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
@@ -356,4 +434,7 @@ impl Generator for GenPointer {
 	}
 	fn done(&self) -> bool { return self.idx >= self.cls.n()-1; }
 	fn reset(&mut self) { self.idx = 0; }
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ptr{{{} of {}}}", self.idx, self.cls.n())
+	}
 }
