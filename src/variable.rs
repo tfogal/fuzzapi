@@ -425,7 +425,13 @@ impl GenPointer {
 }
 
 impl Generator for GenPointer {
-	fn get(&self) -> String { return self.cls.value(self.idx).to_string(); }
+	fn get(&self) -> String {
+		let mut rv = String::new();
+		use std::fmt::Write;
+		write!(&mut rv, "({}){}ull", self.ty.name(),
+		       self.cls.value(self.idx).to_string()).unwrap();
+		return rv;
+	}
 	fn n_state(&self) -> usize { self.cls.n() }
 	fn next(&mut self) {
 		if self.idx < self.cls.n()-1 {
