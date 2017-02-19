@@ -288,7 +288,7 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 
 	let outname: &'static str = ".fuzziter";
 	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
-									"-D_GNU_SOURCE"];
+									"-D_GNU_SOURCE", "-UNDEBUG"];
 	match compile(fname, outname, &args) {
 		Err(x) => return Err(x),
 		Ok(_) => {},
