@@ -189,7 +189,14 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 			} // no else: all vars eventually come from a free
 		};
 		let ref ret = fqn.return_type;
-		try!(write!(strm, "\t{} {} = {}(", ret.ty.name(), ret.src.borrow().name(), fqn.name));
+		// FIXME: declaration for the return value is commented out.  This is
+		// because our current API doesn't have any bound variables for them, so
+		// they just create unused variable warnings.
+		// Another thing to consider is properties (postconditions) to verify.
+		// When we add those it would be useful to be able to reference return
+		// values.  Still, we might need to walk the variable graph and consider
+		// only inserting the declaration when the variable is used.
+		try!(write!(strm, "\t/*{} {} =*/ {}(", ret.ty.name(), ret.src.borrow().name(), fqn.name));
 
 		for (a, ref arg) in fqn.arguments.iter().enumerate() {
 			//let &(_, ref src) = *arg;
