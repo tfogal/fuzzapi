@@ -61,6 +61,9 @@ fn rvalue(src: &variable::Source) -> String {
 	return rv;
 }
 
+fn reset_rv(fqn: &mut Function) {
+	fqn.return_type.src.borrow_mut().generator.reset();
+}
 fn reset_args(fqn: &mut Function) {
 	use std::ops::DerefMut;
 	for arg in fqn.arguments.iter() {
@@ -69,11 +72,16 @@ fn reset_args(fqn: &mut Function) {
 		}
 	}
 }
+fn reset(fqn: &mut Function) {
+	reset_rv(fqn);
+	reset_args(fqn);
+}
 
 fn fqnfinished(func: &Function) -> bool {
+	let rv_done: bool = func.return_type.src.borrow().generator.done();
 	if func.arguments.iter().all( // all ...
 		|ref a| a.src.borrow().generator.done() // ... done
-	) {
+	) && rv_done {
 		return true;
 	}
 	return false;
@@ -83,7 +91,6 @@ fn finished(functions: &Vec<&Function>) -> bool {
 	if functions.iter().all(|ref f| fqnfinished(f)) {
 		return true;
 	}
-	println!("FIXME: should check the return value here too");
 	return false;
 }
 
@@ -98,8 +105,8 @@ fn fqnnext(func: &mut Function) {
 				// function is finished; how did we get here?
 				unreachable!();
 			}
-			println!("next retval!");
 			func.return_type.src.borrow_mut().generator.next();
+			reset_args(func);
 			return;
 		},
 		Some(idx) => idx,
@@ -132,7 +139,7 @@ fn next(functions: &mut Vec<&mut Function>) {
 	fqnnext(&mut functions[nxt]); // ... advance that function ...
 	// ... and reset all the functions after that.
 	for idx in nxt+1..functions.len() {
-		reset_args(&mut functions[idx]);
+		reset(&mut functions[idx]);
 	}
 }
 
