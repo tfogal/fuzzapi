@@ -28,7 +28,7 @@ impl ReturnType {
 
 #[derive(Clone, Debug)]
 pub struct Function {
-	pub return_type: ReturnType,
+	pub retval: ReturnType,
 	pub arguments: Vec<Argument>,
 	pub name: String,
 }
@@ -36,7 +36,7 @@ impl Function {
 	pub fn new(nm: &str, rettype: &ReturnType, args: &Vec<Argument>) -> Self {
 		Function{
 			name: nm.to_string(),
-			return_type: rettype.clone(),
+			retval: rettype.clone(),
 			arguments: args.clone(),
 		}
 	}

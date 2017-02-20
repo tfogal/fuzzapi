@@ -19,7 +19,7 @@ macro_rules! tryp {
 #[allow(dead_code)]
 fn prototypes(strm: &mut std::io::Write, functions: &Vec<Function>) {
 	for fqn in functions.iter() {
-		let ref ty = fqn.return_type.ty;
+		let ref ty = fqn.retval.ty;
 		tryp!(write!(strm, "extern {} {}(", ty.name(), fqn.name));
 		for a in 0..fqn.arguments.len() {
 			let ref argtype = fqn.arguments[a].ty;
@@ -62,7 +62,7 @@ fn rvalue(src: &variable::Source) -> String {
 }
 
 fn reset_rv(fqn: &mut Function) {
-	fqn.return_type.src.borrow_mut().generator.reset();
+	fqn.retval.src.borrow_mut().generator.reset();
 }
 fn reset_args(fqn: &mut Function) {
 	use std::ops::DerefMut;
@@ -78,7 +78,7 @@ fn reset(fqn: &mut Function) {
 }
 
 fn fqnfinished(func: &Function) -> bool {
-	let rv_done: bool = func.return_type.src.borrow().generator.done();
+	let rv_done: bool = func.retval.src.borrow().generator.done();
 	if func.arguments.iter().all( // all ...
 		|ref a| a.src.borrow().generator.done() // ... done
 	) && rv_done {
@@ -100,12 +100,12 @@ fn fqnnext(func: &mut Function) {
 		!a.src.borrow().generator.done()
 	}) {
 		None => { // Then try to iterate the return value
-			if func.return_type.src.borrow().generator.done() {
+			if func.retval.src.borrow().generator.done() {
 				// All arguments and return value are done?  That implies that this
 				// function is finished; how did we get here?
 				unreachable!();
 			}
-			func.return_type.src.borrow_mut().generator.next();
+			func.retval.src.borrow_mut().generator.next();
 			reset_args(func);
 			return;
 		},
@@ -147,7 +147,7 @@ fn next(functions: &mut Vec<&mut Function>) {
 #[allow(dead_code)]
 fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 	for fqn in fqns {
-		tryp!(write!(strm, "{:?} = {}(", fqn.return_type.src.borrow().generator,
+		tryp!(write!(strm, "{:?} = {}(", fqn.retval.src.borrow().generator,
 		             fqn.name));
 		for (a, arg) in fqn.arguments.iter().enumerate() {
 			if arg.src.borrow().is_free() {
@@ -187,7 +187,7 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 				              arg.src.borrow().generator.get()));
 			} // no else: all vars eventually come from a free
 		};
-		let ref ret = fqn.return_type;
+		let ref ret = fqn.retval;
 		// FIXME: declaration for the return value is commented out.  This is
 		// because our current API doesn't have any bound variables for them, so
 		// they just create unused variable warnings.
