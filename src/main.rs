@@ -182,7 +182,6 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	for fqn in fqns {
 		// declare all variables used as arguments to the function
 		for ref arg in fqn.arguments.iter() {
-			//let &(ref argtype, ref src) = *arg;
 			if arg.src.borrow().is_free() {
 				try!(writeln!(strm, "\t{} {} = {};", arg.ty.name(), arg.src.borrow().name(),
 				              arg.src.borrow().generator.get()));
