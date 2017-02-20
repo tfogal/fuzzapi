@@ -172,7 +172,7 @@ impl Generator for GenNothing {
 	fn get(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
-	fn n_state(&self) -> usize { panic!("Null generator has no states."); }
+	fn n_state(&self) -> usize { 1 }
 	fn reset(&mut self) {}
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "(none)")
@@ -201,7 +201,7 @@ impl Generator for GenOpaque {
 	}
 	fn next(&mut self) {}
 	fn done(&self) -> bool { return true; }
-	fn n_state(&self) -> usize { 0 }
+	fn n_state(&self) -> usize { 1 }
 	fn reset(&mut self) {}
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "(opaque-none)")

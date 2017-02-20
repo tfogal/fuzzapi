@@ -352,6 +352,18 @@ fn main() {
 		// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
 		mem::transmute::<&Vec<&mut Function>,&Vec<&Function>>(&functions)
 	};
+
+	{
+		let nstates = immut.iter().fold(1, |n: usize, ref fqn| {
+			let nrv = fqn.retval.src.borrow().generator.n_state();
+			let narg = fqn.arguments.iter().fold(1, |na: usize, ref arg| {
+				return na*arg.src.borrow().generator.n_state();
+			});
+			return n*nrv*narg;
+		});
+		println!("{} states to test.", nstates);
+	}
+
 	while !finished(&immut) {
 		//println!("--------- ITERATION {} --------", i);
 		//state(&mut std::io::stdout(), &immut);
