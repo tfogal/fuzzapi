@@ -101,7 +101,7 @@ impl ToString for ScalarOp {
 // class of all values by knowing where we are in that sequence.
 pub trait Generator {
 	// Grabs the current state as an expression.
-	fn get(&self) -> String;
+	fn value(&self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
 	/// At the end state?
@@ -169,7 +169,7 @@ pub struct GenNothing {}
 // the end?  Then we could do things like sum up all n_state()s in the tree of
 // functions and have it make sense ...
 impl Generator for GenNothing {
-	fn get(&self) -> String { panic!("Null generator called"); }
+	fn value(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
 	fn n_state(&self) -> usize { 1 }
@@ -193,7 +193,7 @@ impl GenOpaque {
 }
 
 impl Generator for GenOpaque {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "/*({})*/{{}}", self.ty.name()).unwrap();
@@ -221,7 +221,7 @@ impl GenEnum {
 }
 
 impl Generator for GenEnum {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -256,7 +256,7 @@ impl GenI32 {
 }
 
 impl Generator for GenI32 {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -291,7 +291,7 @@ impl GenUsize {
 }
 
 impl Generator for GenUsize {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "{}ull", self.cls.value(self.idx).to_string()).unwrap();
@@ -349,7 +349,7 @@ impl GenUDT {
 }
 
 impl Generator for GenUDT {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
 
@@ -360,7 +360,7 @@ impl Generator for GenUDT {
 				Type::Field(ref name, _) => name,
 				ref x => panic!("GenUDT types are {:?}, not fields?", x),
 			};
-			write!(&mut rv, "\t\t.{} = {},\n", nm, self.values[i].get()).unwrap();
+			write!(&mut rv, "\t\t.{} = {},\n", nm, self.values[i].value()).unwrap();
 		}
 
 		write!(&mut rv, "\t}}").unwrap();
@@ -428,7 +428,7 @@ impl GenPointer {
 }
 
 impl Generator for GenPointer {
-	fn get(&self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "({}){}ull", self.ty.name(),
