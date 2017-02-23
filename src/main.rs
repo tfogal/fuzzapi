@@ -14,24 +14,6 @@ macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
 
-// Just an example of how to use the Function API.  This will print out a
-// prototype for every function in the list.
-#[allow(dead_code)]
-fn prototypes(strm: &mut std::io::Write, functions: &Vec<Function>) {
-	for fqn in functions.iter() {
-		let ref ty = fqn.retval.ty;
-		tryp!(write!(strm, "extern {} {}(", ty.name(), fqn.name));
-		for a in 0..fqn.arguments.len() {
-			let ref argtype = fqn.arguments[a].ty;
-			tryp!(write!(strm, "{}", argtype.name()));
-			if a != fqn.arguments.len()-1 {
-				tryp!(write!(strm, ", "));
-			}
-		}
-		tryp!(writeln!(strm, ");"));
-	}
-}
-
 fn header(strm: &mut std::io::Write, hdrs: &Vec<&str>) -> std::io::Result<()>
 {
 	try!(writeln!(strm, "#define _POSIX_C_SOURCE 201212L"));
@@ -171,11 +153,9 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
 
-	//prototypes(strm, fqns);
 	// todo: we need to derive some ordering for functions so that we can do this
 	// properly. for now we just decree that the functions are given in the order
 	// that it makes sense to call them...
-
 	try!(writeln!(strm, "int main() {{"));
 
 	use std::ops::Deref;
