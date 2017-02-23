@@ -43,10 +43,7 @@ fn rvalue(src: &variable::Source) -> String {
 	return rv;
 }
 
-fn reset_rv(fqn: &mut Function) {
-	fqn.retval.src.borrow_mut().generator.reset();
-}
-fn reset_args(fqn: &mut Function) {
+fn reset(fqn: &mut Function) {
 	use std::ops::DerefMut;
 	for arg in fqn.arguments.iter() {
 		if arg.src.borrow().is_free() {
@@ -54,49 +51,38 @@ fn reset_args(fqn: &mut Function) {
 		}
 	}
 }
-fn reset(fqn: &mut Function) {
-	reset_rv(fqn);
-	reset_args(fqn);
-}
 
+// A function is finished its iteration if all free arguments' generators are
+// finished iterating.  But we specially construct non-free arguments'
+// generators such that they always say they are done, so we can just ask if
+// all arguments are done.
 fn fqnfinished(func: &Function) -> bool {
-	let rv_done: bool = func.retval.src.borrow().generator.done();
-	if func.arguments.iter().all( // all ...
-		|ref a| a.src.borrow().generator.done() // ... done
-	) && rv_done {
-		return true;
-	}
-	return false;
+	return func.arguments.iter().all(
+		|ref arg| arg.src.borrow().generator.done()
+	);
 }
 
+// The whole computation is finished if all functions are finished.
 fn finished(functions: &Vec<&Function>) -> bool {
-	if functions.iter().all(|ref f| fqnfinished(f)) {
-		return true;
-	}
-	return false;
+	return functions.iter().all(|ref f| fqnfinished(f));
 }
 
+// Advance to the next state for the given function.
+// Undefined behavior if the function is finished.
 fn fqnnext(func: &mut Function) {
 	assert!(!fqnfinished(func));
+	// Find the "rightmost" (last) argument that is incomplete.
 	let nxt = match func.arguments.iter().rposition(|ref a| {
 		!a.src.borrow().generator.done()
 	}) {
-		None => { // Then try to iterate the return value
-			if func.retval.src.borrow().generator.done() {
-				// All arguments and return value are done?  That implies that this
-				// function is finished; how did we get here?
-				unreachable!();
-			}
-			func.retval.src.borrow_mut().generator.next();
-			reset_args(func);
-			return;
+		None => { // this implies the function is finished.  Bug somewhere.
+			panic!("Bug: function {} not finished, but can't find non-done arg?",
+			       func.name);
 		},
 		Some(idx) => idx,
 	};
-	if func.arguments[nxt].src.borrow().generator.done() {
-		panic!("fqn:{}.{} [next={}] is already done?", func.name,
-		       func.arguments[nxt].src.borrow().name(), nxt);
-	}
+	assert!(!func.arguments[nxt].src.borrow().generator.done());
+	// Iterate that "rightmost unfinished" argument.
 	func.arguments[nxt].src.borrow_mut().generator.next();
 
 	// reset all subsequent arguments.
@@ -113,7 +99,7 @@ fn next(functions: &mut Vec<&mut Function>) {
 		assert!(!finished(&immut));
 	}
 
-	// find the right-most iterator that is not finished ...
+	// find the right-most function that is not finished ...
 	let nxt = match functions.iter().rposition(|ref f| !fqnfinished(&f)) {
 		None => unreachable!(),
 		Some(idx) => idx,
@@ -129,8 +115,7 @@ fn next(functions: &mut Vec<&mut Function>) {
 #[allow(dead_code)]
 fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 	for fqn in fqns {
-		tryp!(write!(strm, "{:?} = {}(", fqn.retval.src.borrow().generator,
-		             fqn.name));
+		tryp!(write!(strm, "{}(", fqn.name));
 		for (a, arg) in fqn.arguments.iter().enumerate() {
 			if arg.src.borrow().is_free() {
 				tryp!(write!(strm, "{:?}", arg.src.borrow().generator));
@@ -306,8 +291,8 @@ fn main() {
 	let fa2 = Argument::new(&hs_data, hsd_var.clone());
 	let hcreate_args = vec![fa1, fa2];
 
-	let hc_retval = variable::Source::free("crterr", &Type::I32,
-																				 ScalarOp::Null);
+	let hc_retval = variable::Source::retval("crterr", "hcreate_r",
+	                                         ScalarOp::Null);
 	let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
 	let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
@@ -324,23 +309,22 @@ fn main() {
 		Argument::new(&entryp, rv),
 		Argument::new(&hs_data_ptr, htab),
 	];
-	let hs_rv = variable::Source::free("hserr", &Type::Integer, ScalarOp::Null);
+	let hs_rv = variable::Source::retval("hserr", "hsearch_r", ScalarOp::Null);
 	let mut hsearch = Function::new("hsearch_r",
 		&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
 
 	let mut functions: Vec<&mut Function> = vec![&mut hcreate, &mut hsearch];
 	let immut = unsafe {
 		// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
-		mem::transmute::<&Vec<&mut Function>,&Vec<&Function>>(&functions)
+		mem::transmute::<&Vec<&mut Function>, &Vec<&Function>>(&functions)
 	};
 
 	{
 		let nstates = immut.iter().fold(1, |n: usize, ref fqn| {
-			let nrv = fqn.retval.src.borrow().generator.n_state();
 			let narg = fqn.arguments.iter().fold(1, |na: usize, ref arg| {
 				return na*arg.src.borrow().generator.n_state();
 			});
-			return n*nrv*narg;
+			return n*narg;
 		});
 		println!("{} states to test.", nstates);
 	}

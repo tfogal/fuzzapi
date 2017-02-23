@@ -5,7 +5,6 @@
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
 use std::cell::RefCell;
 use std::rc::Rc;
-use function::*;
 use typ::*;
 use tc::*;
 
@@ -18,7 +17,7 @@ pub struct Source {
 	// them in vectors because Rust is annoying and doesn't let us create an
 	// "empty" RefCell.
 	pub parent: Vec<Rc<RefCell<Source>>>,
-	fqn: Vec<Rc<Function>>,
+	fqn: String,
 }
 impl Source {
 	// Construct a free variable of the given type that needs the given ScalarOp.
@@ -26,7 +25,7 @@ impl Source {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: generator(ty), op: o,
 			parent: Vec::new(),
-			fqn: Vec::new(),
+			fqn: "".to_string(),
 		}))
 	}
 	// Similar construction, but this takes an explicit generator for when the
@@ -36,35 +35,35 @@ impl Source {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: gen, op: o,
 			parent: Vec::new(),
-			fqn: Vec::new(),
+			fqn: "".to_string(),
 		}))
 	}
 	pub fn is_free(&self) -> bool {
-		return self.name.len() != 0;
+		// Both free and return variables have names; but free variables won't have
+		// an associated function.
+		return self.name.len() != 0 && self.fqn.len() == 0;
 	}
 
 	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) -> Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
 			parent: vec![parent],
-			fqn: Vec::new(),
+			fqn: "".to_string(),
 		}))
 	}
 	pub fn is_bound(&self) -> bool {
 		return self.parent.len() == 1;
 	}
 
-/*
-	pub fn retval(fqn: Rc<Function>, oper: ScalarOp) -> Rc<RefCell<Source>> {
+	pub fn retval(name: &str, fqn: &str, oper: ScalarOp) -> Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
-			name: "".to_string(), generator: Box::new(GenNothing{}), op: oper,
+			name: name.to_string(), generator: Box::new(GenNothing{}), op: oper,
 			parent: Vec::new(),
-			fqn: vec![fqn],
+			fqn: fqn.to_string(),
 		}))
 	}
-*/
 	pub fn is_retval(&self) -> bool {
-		return self.fqn.len() == 1;
+		return self.fqn.len() != 0;
 	}
 }
 
@@ -72,7 +71,7 @@ impl Name for Source {
 	fn name(&self) -> String {
 		if self.is_free() { return self.name.clone(); }
 		if self.is_bound() { return self.parent[0].borrow().name(); }
-		if self.is_retval() { return self.fqn[0].name.clone(); }
+		if self.is_retval() { return self.fqn.clone(); }
 		println!("invalid source: {:?}", self);
 		unreachable!();
 	}
