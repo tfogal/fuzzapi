@@ -178,15 +178,22 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	return Ok(());
 }
 
-fn system(cmd: String) -> Result<(), std::io::Error> {
-	let run = match Command::new(cmd).output() {
+fn system(cmd: String) -> Result<(), String> {
+	let run = match Command::new(cmd.clone()).output() {
 		Err(e) => {
-			println!("Program error: {}", e); // FIXME stderr
+			use std::fmt;
 			// cat 'run' ...
-			return Err(e);
+			return Err(fmt::format(format_args!("exec {} error: {}", cmd, e)));
 		},
 		Ok(x) => x,
 	};
+	let err = String::from_utf8(run.stderr).unwrap();
+	if err.len() > 0 || !run.status.success() {
+		use std::fmt;
+    return Err(fmt::format(format_args!("execution of {} failed: {}",
+		                                    cmd, err)));
+	}
+
 	let runout: String = String::from_utf8(run.stdout).unwrap();
 	if runout.len() > 0 {
 		println!("program output: '{}'", runout);
@@ -260,9 +267,11 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 	};
 
 	let cmdname: String = String::from("./") + String::from(outname).as_str();
-	if system(cmdname).is_err() {
+	let out = system(cmdname);
+	if out.is_err() {
 		use std::io::Write;
-		writeln!(&mut std::io::stderr(), "Bug found, exiting.").unwrap();
+		writeln!(&mut std::io::stderr(), "Execution error: {}",
+		         out.err().unwrap()).unwrap();
 		std::process::exit(1);
 	}
 	return Ok(());
