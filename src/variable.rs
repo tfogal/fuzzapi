@@ -3,8 +3,10 @@
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
+extern crate rand;
 use std::cell::RefCell;
 use std::rc::Rc;
+use rand::distributions::{IndependentSample, Range};
 use typ::*;
 use tc::*;
 
@@ -144,6 +146,12 @@ pub fn generator(t: &Type) -> Box<Generator> {
 	match t {
 		&Type::Enum(_, _) => Box::new(GenEnum::create(t)),
 		&Type::I32 => Box::new(GenI32::create(t)),
+		// Pointers to characters are interpreted to mean CStrings.
+		&Type::Pointer(ref ty)
+			if match **ty { Type::Character => true, _ => false } => {
+				Box::new(GenCString::create(t))
+			},
+		// Pointers to anything else are just generic pointers...
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
 		&Type::Field(_, ref x) => generator(x),
 		&Type::Usize => Box::new(GenUsize::create(t)),
@@ -444,5 +452,128 @@ impl Generator for GenPointer {
 	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "ptr{{{} of {}}}", self.idx, self.cls.n())
+	}
+}
+
+// Generate an arbitrary CString.
+// NULL, i.e. not a string.
+// 0 length strings
+// 1 character strings of a 'normal' character
+// 1 character strings of a 'special' character
+// N character strings of 'normal' characters
+// N character strings of 'special' characters
+// N character strings mixing normal+special characters
+// very long strings
+pub struct GenCString {
+	idx: usize,
+	ascii: rand::distributions::range::Range<u8>,
+	special: rand::distributions::range::Range<u8>,
+}
+
+// Manual implement debug instead of derive()ing it.  This works around rand's
+// "Range" not implementing debug.  Of course, we don't actually care to print
+// out the state of random ranges anyway.
+impl ::std::fmt::Debug for GenCString {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> fmt::Result {
+		self.dbg(f)
+	}
+}
+
+impl GenCString {
+	pub fn create(t: &Type) -> Self {
+		let x = Type::Pointer(Box::new(Type::Character));
+		assert!(*t == x);
+		GenCString{idx: 0, ascii: Range::new(32,126), special: Range::new(0, 31)}
+	}
+
+	// Generate a 'normal' character that is valid in strings.  This means:
+	//   No ?: groups of ??anything are (useless) C trigraphs,
+	//   No ": as it might terminate the string early.
+	//   No \: it could escape the next character, which might be the end, ".
+	// few characters to be embedded.
+	fn normal(&self, mut rng: &mut rand::ThreadRng) -> char {
+		let mut x: u8 = self.ascii.ind_sample(&mut rng);
+		let disallowed: [u8;3] = ['"' as u8, '?' as u8, '\\' as u8];
+		while disallowed.iter().any(|y| x == *y) {
+			x = self.ascii.ind_sample(&mut rng);
+		}
+		return x as char;
+	}
+
+	// Generate a 'special' character that is valid in strings.
+	fn special(&self, mut rng: &mut rand::ThreadRng) -> char {
+		let mut x: u8 = self.special.ind_sample(&mut rng);
+		let disallowed = [7,8,9,10,11,12,13];
+		while disallowed.iter().any(|y| x == *y) {
+			x = self.special.ind_sample(&mut rng);
+		}
+		return x as char;
+	}
+}
+
+impl Generator for GenCString {
+	fn value(&self) -> String {
+		// special case null, so that we can wrap all other cases in "".
+		if self.idx == 0 {
+			return "\"\"".to_string();
+		}
+
+		use std::fmt::Write;
+		let mut rv = String::new();
+		write!(&mut rv, "\"").unwrap();
+		assert!(self.idx < 8);
+		let mut rng: rand::ThreadRng = rand::thread_rng();
+		match self.idx {
+			0 => panic!("we already handled this case, above."),
+			1 => {}, // just ""
+			2 => { // a single normal character:
+				write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+			},
+			3 => { // a single special character:
+				write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+			},
+			4 => { // a collection of N normal characters:
+				let length = Range::new(3,128).ind_sample(&mut rng);
+				for _ in 0..length {
+					write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+				}
+			},
+			5 => { // a collection of N special characters:
+				let length = Range::new(3,128).ind_sample(&mut rng);
+				for _ in 0..length {
+					write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+				}
+			},
+			6 => { // a collection of N characters with normal + special mixed.
+				let length = Range::new(3,128).ind_sample(&mut rng);
+				for _ in 0..length {
+					if Range::new(0, 1).ind_sample(&mut rng) == 0 {
+						write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+					} else {
+						write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+					}
+				}
+			},
+			7 => { // absurdly long strings.
+				let length = Range::new(512, 32768).ind_sample(&mut rng);
+				for _ in 0..length {
+					write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+				}
+			},
+			_ => panic!("unhandled case {}", self.idx),
+		};
+		write!(&mut rv, "\"").unwrap();
+		return rv;
+	}
+	fn n_state(&self) -> usize { 8 }
+	fn next(&mut self) {
+		if self.idx < 8 {
+			self.idx = self.idx + 1
+		}
+	}
+	fn done(&self) -> bool { return self.idx >= 7; }
+	fn reset(&mut self) { self.idx = 0; }
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "cstr{{{} of {}}}", self.idx, 8)
 	}
 }
