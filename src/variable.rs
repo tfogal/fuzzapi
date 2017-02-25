@@ -503,7 +503,7 @@ impl GenCString {
 	// Generate a 'special' character that is valid in strings.
 	fn special(&self, mut rng: &mut rand::ThreadRng) -> char {
 		let mut x: u8 = self.special.ind_sample(&mut rng);
-		let disallowed = [7,8,9,10,11,12,13];
+		let disallowed = [7,8,9,10,11,12,13, 27];
 		while disallowed.iter().any(|y| x == *y) {
 			x = self.special.ind_sample(&mut rng);
 		}
