@@ -102,7 +102,7 @@ impl ToString for ScalarOp {
 // class of all values by knowing where we are in that sequence.
 pub trait Generator {
 	// Grabs the current state as an expression.
-	fn value(&self) -> String;
+	fn value(&mut self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
 	/// At the end state?
@@ -176,7 +176,7 @@ pub struct GenNothing {}
 // the end?  Then we could do things like sum up all n_state()s in the tree of
 // functions and have it make sense ...
 impl Generator for GenNothing {
-	fn value(&self) -> String { panic!("Null generator called"); }
+	fn value(&mut self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
 	fn n_state(&self) -> usize { 1 }
@@ -200,7 +200,7 @@ impl GenOpaque {
 }
 
 impl Generator for GenOpaque {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "/*({})*/{{}}", self.ty.name()).unwrap();
@@ -228,7 +228,7 @@ impl GenEnum {
 }
 
 impl Generator for GenEnum {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -263,7 +263,7 @@ impl GenI32 {
 }
 
 impl Generator for GenI32 {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -298,7 +298,7 @@ impl GenUsize {
 }
 
 impl Generator for GenUsize {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "{}ull", self.cls.value(self.idx).to_string()).unwrap();
@@ -356,7 +356,7 @@ impl GenUDT {
 }
 
 impl Generator for GenUDT {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
 
@@ -435,7 +435,7 @@ impl GenPointer {
 }
 
 impl Generator for GenPointer {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "({}){}ull", self.ty.name(),
@@ -466,11 +466,11 @@ impl Generator for GenPointer {
 // very long strings
 pub struct GenCString {
 	idx: usize,
-	ascii: rand::distributions::range::Range<u8>,
-	special: rand::distributions::range::Range<u8>,
+	printable: TC_Char_Printable,
+	control: TC_Char_Special,
 }
 
-// Manual implement debug instead of derive()ing it.  This works around rand's
+// Manually implement debug instead of derive()ing it.  This works around rand's
 // "Range" not implementing debug.  Of course, we don't actually care to print
 // out the state of random ranges anyway.
 impl ::std::fmt::Debug for GenCString {
@@ -483,81 +483,84 @@ impl GenCString {
 	pub fn create(t: &Type) -> Self {
 		let x = Type::Pointer(Box::new(Type::Character));
 		assert!(*t == x);
-		GenCString{idx: 0, ascii: Range::new(32,126), special: Range::new(0, 31)}
+		GenCString{idx: 0, printable: TC_Char_Printable::new(),
+		           control: TC_Char_Special::new() }
 	}
 
 	// Generate a 'normal' character that is valid in strings.  This means:
-	//   No ?: groups of ??anything are (useless) C trigraphs,
+	//   No ?: groups of ??anything are lame C trigraphs,
 	//   No ": as it might terminate the string early.
 	//   No \: it could escape the next character, which might be the end, ".
-	// few characters to be embedded.
-	fn normal(&self, mut rng: &mut rand::ThreadRng) -> char {
-		let mut x: u8 = self.ascii.ind_sample(&mut rng);
-		let disallowed: [u8;3] = ['"' as u8, '?' as u8, '\\' as u8];
+	fn normal(&mut self) -> char {
+		let mut x: char = self.printable.value(0);
+		let disallowed: [char;3] = ['"', '?', '\\'];
 		while disallowed.iter().any(|y| x == *y) {
-			x = self.ascii.ind_sample(&mut rng);
+			x = self.printable.value(0);
 		}
 		return x as char;
 	}
 
 	// Generate a 'special' character that is valid in strings.
-	fn special(&self, mut rng: &mut rand::ThreadRng) -> char {
-		let mut x: u8 = self.special.ind_sample(&mut rng);
+	fn special(&mut self) -> char {
+		let mut x: char = self.control.value(0);
 		let disallowed = [7,8,9,10,11,12,13, 27];
-		while disallowed.iter().any(|y| x == *y) {
-			x = self.special.ind_sample(&mut rng);
+		while disallowed.iter().any(|y| x as u8 == *y) {
+			x = self.control.value(0);
 		}
 		return x as char;
 	}
 }
 
 impl Generator for GenCString {
-	fn value(&self) -> String {
+	fn value(&mut self) -> String {
 		// special case null, so that we can wrap all other cases in "".
 		if self.idx == 0 {
-			return "\"\"".to_string();
+			return "NULL".to_string();
 		}
 
 		use std::fmt::Write;
 		let mut rv = String::new();
 		write!(&mut rv, "\"").unwrap();
 		assert!(self.idx < 8);
-		let mut rng: rand::ThreadRng = rand::thread_rng();
 		match self.idx {
 			0 => panic!("we already handled this case, above."),
 			1 => {}, // just ""
 			2 => { // a single normal character:
-				write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+				write!(&mut rv, "{}", self.normal()).unwrap();
 			},
 			3 => { // a single special character:
-				write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+				write!(&mut rv, "{}", self.special()).unwrap();
 			},
 			4 => { // a collection of N normal characters:
+				let mut rng: rand::ThreadRng = rand::thread_rng();
 				let length = Range::new(3,128).ind_sample(&mut rng);
 				for _ in 0..length {
-					write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+					write!(&mut rv, "{}", self.normal()).unwrap();
 				}
 			},
 			5 => { // a collection of N special characters:
+				let mut rng: rand::ThreadRng = rand::thread_rng();
 				let length = Range::new(3,128).ind_sample(&mut rng);
 				for _ in 0..length {
-					write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+					write!(&mut rv, "{}", self.special()).unwrap();
 				}
 			},
 			6 => { // a collection of N characters with normal + special mixed.
+				let mut rng: rand::ThreadRng = rand::thread_rng();
 				let length = Range::new(3,128).ind_sample(&mut rng);
 				for _ in 0..length {
 					if Range::new(0, 1).ind_sample(&mut rng) == 0 {
-						write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+						write!(&mut rv, "{}", self.normal()).unwrap();
 					} else {
-						write!(&mut rv, "{}", self.special(&mut rng)).unwrap();
+						write!(&mut rv, "{}", self.special()).unwrap();
 					}
 				}
 			},
 			7 => { // absurdly long strings.
-				let length = Range::new(512, 32768).ind_sample(&mut rng);
+				let mut rng: rand::ThreadRng = rand::thread_rng();
+				let length = Range::new(512,32768).ind_sample(&mut rng);
 				for _ in 0..length {
-					write!(&mut rv, "{}", self.normal(&mut rng)).unwrap();
+					write!(&mut rv, "{}", self.normal()).unwrap();
 				}
 			},
 			_ => panic!("unhandled case {}", self.idx),

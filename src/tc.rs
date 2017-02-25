@@ -32,7 +32,7 @@ use typ::*;
 // A class of types.
 pub trait TypeClass<T> {
 	fn n(&self) -> usize;
-	fn value(&self, class: usize) -> T;
+	fn value(&mut self, class: usize) -> T;
 }
 
 // Specialization is not yet stable in rust.  Thus the types are not type
@@ -60,13 +60,22 @@ pub struct TC_Enum {
 	values: Vec<u32>
 }
 
+#[allow(non_camel_case_types)]
+pub struct TC_Char_Printable {
+	rng: rand::ThreadRng,
+}
+#[allow(non_camel_case_types)]
+pub struct TC_Char_Special {
+	rng: rand::ThreadRng,
+}
+
 // A u8 has four classes: 0, near 0, and near 255.  The idea is that 0s bring
 // out all sorts of nonsense; near 0 is a "normal" case.  Near 255 and 255 will
 // highlight overflow as well as cases that might inappropriately cast to
 // signed or similar.
 impl TypeClass<u8> for TC_U8 {
 	fn n(&self) -> usize { return 4; }
-	fn value(&self, class: usize) -> u8 {
+	fn value(&mut self, class: usize) -> u8 {
 		// UGH.  Getting a static Range<x> is a nightmare.  For now we'll just
 		// reallocate every damn call.
 		let mut rng: rand::ThreadRng = rand::thread_rng();
@@ -84,7 +93,7 @@ impl TypeClass<u8> for TC_U8 {
 
 impl TypeClass<u16> for TC_U16 {
 	fn n(&self) -> usize { return 4; }
-	fn value(&self, class: usize) -> u16 {
+	fn value(&mut self, class: usize) -> u16 {
 		let mut rng: rand::ThreadRng = rand::thread_rng();
 		let du16_1_32767 = Range::new(1, 128);
 		let du16_32768_65534 = Range::new(129, 254);
@@ -103,7 +112,7 @@ impl TC_Usize {
 }
 impl TypeClass<usize> for TC_Usize {
 	fn n(&self) -> usize { return 4; }
-	fn value(&self, class: usize) -> usize {
+	fn value(&mut self, class: usize) -> usize {
 		//let du_pos_small = Range::new(1, i32::max_value()/2);
 		let mut rng: rand::ThreadRng = rand::thread_rng();
 		let du_small = Range::new(1, usize::max_value()/2);
@@ -125,7 +134,7 @@ impl TC_I32 {
 }
 impl TypeClass<i32> for TC_I32 {
 	fn n(&self) -> usize { return 7; }
-	fn value(&self, class: usize) -> i32 {
+	fn value(&mut self, class: usize) -> i32 {
 		let mut rng: rand::ThreadRng = rand::thread_rng();
 		let du_neg_large = Range::new(i32::min_value()+1, i32::min_value()/2);
 		let du_neg_small = Range::new(i32::min_value()/2+1, -1);
@@ -162,7 +171,7 @@ impl TypeClass<i32> for TC_Enum {
 	fn n(&self) -> usize { self.values.len() }
 	// Because we already pulled out the values, we can just use the class as an
 	// index into that list.
-	fn value(&self, class: usize) -> i32 {
+	fn value(&mut self, class: usize) -> i32 {
 		assert!(class < self.values.len());
 		return self.values[class] as i32;
 	}
@@ -177,7 +186,7 @@ impl TC_Pointer {
 // Pointers are pretty simple: null-initialized or not.
 impl TypeClass<usize> for TC_Pointer {
 	fn n(&self) -> usize { 2 }
-	fn value(&self, class: usize) -> usize {
+	fn value(&mut self, class: usize) -> usize {
 		let mut rng: rand::ThreadRng = rand::thread_rng();
 		let arb = Range::new(1, usize::max_value()-1);
 		match class {
@@ -185,5 +194,43 @@ impl TypeClass<usize> for TC_Pointer {
 			1 => arb.ind_sample(&mut rng),
 			_ => panic!("invalid class {} given for TC_Pointer", class),
 		}
+	}
+}
+
+impl TC_Char_Printable {
+	pub fn new() -> Self {
+		TC_Char_Printable{ rng: rand::thread_rng() }
+	}
+}
+impl TypeClass<char> for TC_Char_Printable {
+	fn n(&self) -> usize { 1 }
+	fn value(&mut self, class: usize) -> char {
+		assert!(class == 0);
+		let dchar_print = Range::new(32, 126);
+		return dchar_print.ind_sample(&mut self.rng) as u8 as char;
+	}
+}
+impl ::std::fmt::Debug for TC_Char_Printable {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		write!(f, "printablechar{{0 of 1}}")
+	}
+}
+
+impl TC_Char_Special {
+	pub fn new() -> Self {
+		TC_Char_Special{ rng: rand::thread_rng() }
+	}
+}
+impl TypeClass<char> for TC_Char_Special {
+	fn n(&self) -> usize { 1 }
+	fn value(&mut self, class: usize) -> char {
+		assert!(class == 0);
+		let dchar_special = Range::new(0, 31);
+		return dchar_special.ind_sample(&mut self.rng) as u8 as char;
+	}
+}
+impl ::std::fmt::Debug for TC_Char_Special {
+	fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+		write!(f, "specialchar{{0 of 1}}")
 	}
 }

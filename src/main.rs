@@ -148,9 +148,9 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 		// declare all variables used as arguments to the function
 		for ref arg in fqn.arguments.iter() {
 			if arg.src.borrow().is_free() {
-				try!(writeln!(strm, "\t{} {} = {};", arg.ty.name(),
-				              arg.src.borrow().name(),
-				              arg.src.borrow().generator.value()));
+				let nm: String = arg.src.borrow().name();
+				try!(writeln!(strm, "\t{} {} = {};", arg.ty.name(), nm,
+				              arg.src.borrow_mut().generator.value()));
 			} // no else: all vars eventually come from a free
 		};
 		let ref ret = fqn.retval;
