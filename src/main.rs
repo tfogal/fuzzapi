@@ -134,7 +134,7 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 
 fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 {
-	let hdrs: Vec<&str> = vec!["search.h"];
+	let hdrs: Vec<&str> = vec!["stdlib.h", "search.h"];
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
 
