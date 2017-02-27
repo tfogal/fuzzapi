@@ -114,28 +114,10 @@ pub trait Generator {
 	fn dbg(&self, &mut fmt::Formatter) -> fmt::Result;
 }
 
-/*
-fn tjffmt(f: &mut fmt::Formatter, generator: &Box<Generator>) -> fmt::Result {
-	if let Ok(gen) = generator.downcast::<GenEnum>() {
-		write!(f, "{:?}", gen)
-	} else {
-		write!(f, "gener{{}}")
-	}
-}
-*/
-
 use std::fmt;
 impl fmt::Debug for Box<Generator> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		self.dbg(f)
-//		write!(f, "{:?}", self.dbg(f))
-/*
-		if let Ok(gen) = Box::downcast::<Generator>(self) {
-			write!(f, "{:?}", gen)
-		} else {
-			write!(f, "gener{{}}")
-		}
-*/
 	}
 }
 

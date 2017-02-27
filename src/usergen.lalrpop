@@ -1,0 +1,141 @@
+use std::str::FromStr;
+use ast;
+use typ::*;
+use util;
+
+grammar;
+
+pub LGenerator: ast::UserGen = {
+"generator" <tyname: LType> <nstates: LNum> <stlist: LState+> => {
+	let typ: Type = util::type_from_str(tyname.as_str());
+	ast::UserGen::new(typ, &stlist)
+}
+};
+
+LType: String = {
+	// Can we do case-insensitive matching with LALRPop?
+	"I8" => "I8".to_string(), "i8" => "i8".to_string(),
+	"I16" => "I16".to_string(), "i16" => "i16".to_string(),
+	"I32" => "I32".to_string(), "i32" => "i32".to_string(),
+	"I64" => "I64".to_string(), "i64" => "i64".to_string(),
+	"U8" => "U8".to_string(), "u8" => "u8".to_string(),
+	"U16" => "U16".to_string(), "u16" => "u16".to_string(),
+	"U32" => "U32".to_string(), "u32" => "u32".to_string(),
+	"U64" => "U64".to_string(), "u64" => "u64".to_string(),
+};
+
+LState: ast::Expression = {
+	"state:" <stnum: LNum> <exp: LExpression> => exp
+};
+
+LExpression: ast::Expression = {
+	<lt: LType> ":" "constant" "(" <num: LNum> ")" => {
+		if lt == "string" {
+			let scnst = ast::Constant::String(lt.to_string());
+			return ast::Expression::ConstExpr(scnst);
+		}
+		let typ = util::type_from_str(lt.as_str());
+		let cnsttype: ast::Constant = match typ {
+			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
+				ast::Constant::Signed(num),
+			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
+			Type::Unsigned =>
+				ast::Constant::Unsigned(num as u64),
+			_ => panic!("unhandled type '{:?}'", typ),
+		};
+		ast::Expression::ConstExpr(cnsttype)
+	},
+	<lt: LType> ":" "min" "(" ")" =>
+		ast::Expression::MinExpr(util::type_from_str(lt.as_str())),
+	<lt: LType> ":" "max" "(" ")" =>
+		ast::Expression::MaxExpr(util::type_from_str(lt.as_str())),
+	<lt: LType> ":" "random" "(" <low: LExpression> "," <high: LExpression> ")" =>
+		ast::Expression::RandomExpr(util::type_from_str(lt.as_str()),
+		                               Box::new(low), Box::new(high)),
+	// Ugh.  LALRPop is broken in that it doesn't let us specify operator
+	// precedence.
+	// Instead we have to encode the precedence into the tree, which is possible
+	// for simple things but *impossible* for our grammar, because we want actual
+	// real recursion in our expression definition (... as any language would)
+	// allow all of the above expressions as the RHS of all the following
+	// expressions, and such recursion *requires* precedence specification.
+	<left: LExpression> "+" <right: LFactor> =>
+		ast::Expression::Compound(Box::new(left), ast::Opcode::Add,
+		                             Box::new(right)),
+	<left: LExpression> "-" <right: LFactor> =>
+		ast::Expression::Compound(Box::new(left), ast::Opcode::Sub,
+		                             Box::new(right)),
+	<left: LExpression> "/" <right: LTerm> =>
+		ast::Expression::Compound(Box::new(left), ast::Opcode::Div,
+		                             Box::new(right)),
+	<left: LExpression> "*" <right: LTerm> =>
+		ast::Expression::Compound(Box::new(left), ast::Opcode::Mul,
+		                             Box::new(right)),
+	<left: LFactor> "%" <right: LTerm> =>
+		ast::Expression::Compound(Box::new(left), ast::Opcode::Mod,
+		                             Box::new(right)),
+};
+
+LFactor: ast::Expression = {
+	<lt: LTerm> => lt,
+};
+
+LTerm: ast::Expression = {
+	<lt: LType> ":" "constant" "(" <num: LNum> ")" => {
+		if lt == "string" {
+			panic!("Strings can't be part of compound expressions.");
+		}
+		let typ = util::type_from_str(lt.as_str());
+		let cnsttype: ast::Constant = match typ {
+			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
+				ast::Constant::Signed(num),
+			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
+			Type::Unsigned =>
+				ast::Constant::Unsigned(num as u64),
+			_ => panic!("unhandled type '{:?}'", typ),
+		};
+		ast::Expression::ConstExpr(cnsttype)
+	},
+};
+
+LNum: i64 = <strtmp:r"-?[0-9]"+> => {
+	// ... first convert the Vec<&str> into a String.
+	use std::fmt::Write;
+	let mut asstr: String = String::new();
+	for ch in strtmp {
+		write!(&mut asstr, "{}", ch).unwrap();
+	}
+	i64::from_str(&asstr).unwrap()
+/*
+Start: "generator"
+Type: "I32" | "U32" | ...
+Integer: [:digit:]+
+State: "state:" Integer
+Expression:
+	| TypeConstant
+	| TypeCall
+TypeConstant: Type ":" "constant" "(" Integer ")"
+TypeCall:
+	| Type ":" MinExpr
+	| Type ":" MaxExpr
+	| Type ":" Random 
+MinExpr: "min" "(" ")"
+MaxExpr: "max" "(" ")"
+Random: "random" "(" Expr "," Expr ")"
+Expr:
+	| SimpleExpr
+	| CompoundExpr
+SimpleExpr:
+	| Integer
+	| "\"" String "\""
+CompoundExpr:
+	| MinExpr
+	| MaxExpr
+	| Expr Operator Expr
+Operator: '+' | '-' | '*' | '/' | '%'
+
+		enum State {
+			Start, Type, Integer,
+		}
+*/
+};

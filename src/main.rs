@@ -1,11 +1,15 @@
 use std::collections::btree_map::BTreeMap;
 use std::fs::File;
 use std::mem;
+use std::path::Path;
 use std::process::Command;
 extern crate rand;
+mod ast;
 mod function;
+mod usergen;
 mod tc;
 mod typ;
+mod util;
 mod variable;
 use function::*;
 use typ::*;
@@ -338,6 +342,23 @@ fn main() {
 		println!("{} states to test.", nstates);
 	}
 
+	{
+		// todo: search path for hf files.
+		let p = Path::new("../share/stdgen.hf");
+		let mut fp = match File::open(&p) {
+			Err(e) => panic!("error reading fuzz: {}", e),
+			Ok(f) => f,
+		};
+		let mut s = String::new();
+		use std::io::Read;
+		fp.read_to_string(&mut s).unwrap();
+		let stdgen = match usergen::parse_LGenerator(s.as_str()) {
+			Err(e) => panic!("err: {:?}", e),
+			Ok(a) => a,
+		};
+		println!("parsed: {:?}", Box::new(stdgen));
+	}
+
 	while !finished(&immut) {
 		//println!("--------- ITERATION {} --------", i);
 		//state(&mut std::io::stdout(), &immut);
@@ -353,4 +374,113 @@ fn main() {
 		Err(e) => panic!("compile/test error: {}", e),
 		Ok(_) => {},
 	};
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+	#[test]
+	fn parse_generator() {
+		let s = "generator I32 1 state:86 i32:constant(42)";
+		assert!(usergen::parse_LGenerator(s).is_ok());
+	}
+	#[test]
+	fn minexpr() {
+		let s = "generator U8 1 state:0 u8:min()";
+		assert!(usergen::parse_LGenerator(s).is_ok());
+	}
+	#[test]
+	fn maxexpr() {
+		let s = "generator U16 1 state:0 u16:max()";
+		assert!(usergen::parse_LGenerator(s).is_ok());
+	}
+
+	#[test]
+	fn randexpr_constants() {
+		let s = "generator U32 1 state:0 u32:random(i32:constant(1),";
+		let s = s.to_string() + "i32:constant(32768))";
+		let t = s.as_str();
+		assert!(usergen::parse_LGenerator(t).is_ok());
+	}
+
+	#[test]
+	fn randexpr_min_max() {
+		let s = "generator U32 1 state:0 u32:random(i32:min(), i32:max())";
+		assert!(usergen::parse_LGenerator(s).is_ok());
+	}
+
+	#[test]
+	fn randexpr_complex() {
+		let s =
+			"generator i32 1".to_string() +
+			"state:5 i32:random(i32:max() / i32:constant(2), i32:constant(1))";
+		match usergen::parse_LGenerator(s.as_str()) {
+			Ok(_) => {},
+			Err(e) => panic!("err: {:?}", e),
+		};
+	}
+
+	#[test]
+	fn randexpr_compound_both_clauses() {
+		let s =
+			"generator i32 1".to_string() +
+			"state:5 i32:random(i32:max() * i32:constant(2), " +
+			"i32:min()+i32:constant(1)*i32:constant(2))";
+		match usergen::parse_LGenerator(s.as_str()) {
+			Ok(_) => {},
+			Err(e) => panic!("err: {:?}", e),
+		};
+	}
+
+	#[test]
+	fn randexpr_full() { // random() expression with compound sides
+		let s =
+			"generator i32 1".to_string() +
+			"state:5 i32:random(i32:max() / i32:constant(2), " +
+			"i32:max()-i32:constant(1))";
+		match usergen::parse_LGenerator(s.as_str()) {
+			Ok(_) => {},
+			Err(e) => panic!("err: {:?}", e),
+		};
+	}
+
+	#[test]
+	fn multiple_states() {
+		let s = "generator u64 2 state:0 u64:min() state:1 u64:max()";
+		match usergen::parse_LGenerator(s) {
+			Ok(_) => {},
+			Err(e) => panic!("err: {:?}", e),
+		};
+	}
+
+	#[test]
+	fn gen_interp_constant() {
+		use variable::Generator;
+		let s = "generator u8 1 state:0 u8:min()";
+		let mut ugen = match usergen::parse_LGenerator(s) {
+			Ok(prs) => prs,
+			Err(e) => panic!("parse error: {:?}", e),
+		};
+		let v = ugen.value();
+		assert_eq!(v, "0");
+	}
+
+	#[test]
+	fn gen_interp_compound() { // compound expression interpretation
+		use variable::Generator;
+		let mut s = "generator u8 1 state:0 u8:constant(4)+u8:constant(6)";
+		let v = usergen::parse_LGenerator(s).unwrap().value();
+		assert_eq!(v, "10");
+		s = "generator u8 1 state:0 u8:constant(8)-u8:constant(6)";
+		assert_eq!(usergen::parse_LGenerator(s).unwrap().value(), "2");
+
+		s = "generator u8 1 state:0 u8:constant(4)*u8:constant(5)";
+		assert_eq!(usergen::parse_LGenerator(s).unwrap().value(), "20");
+
+		s = "generator u8 1 state:0 u8:constant(12)/u8:constant(2)";
+		assert_eq!(usergen::parse_LGenerator(s).unwrap().value(), "6");
+
+		s = "generator u8 1 state:0 u8:constant(5) % u8:constant(2)";
+		assert_eq!(usergen::parse_LGenerator(s).unwrap().value(), "1");
+	}
 }
