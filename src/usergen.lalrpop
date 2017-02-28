@@ -5,7 +5,11 @@ use util;
 
 grammar;
 
-pub LGenerator: ast::UserGen = {
+pub LGeneratorList: Vec<ast::UserGen> = {
+	<ugenlist: LGenerator+> => ugenlist,
+};
+
+LGenerator: ast::UserGen = {
 "generator" <tyname: LType> <nstates: LNum> <stlist: LState+> => {
 	let typ: Type = util::type_from_str(tyname.as_str());
 	ast::UserGen::new(typ, &stlist)
