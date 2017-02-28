@@ -166,10 +166,10 @@ impl ::variable::Generator for UserGen {
 	fn reset(&mut self) { self.idx = 0; }
 
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "UserGen{{{:?}, state {} of {}: {{", self.ty,
+		write!(f, "UserGen{{{:?}, state {} of {}: {{\n", self.ty,
 		       self.idx, self.states.len()).unwrap();
 		for state in self.states.iter() {
-			write!(f, "{:?}", state).unwrap();
+			write!(f, "\t{:?}\n", state).unwrap();
 		}
 		write!(f, "}}}}")
 	}
