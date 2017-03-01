@@ -10,13 +10,13 @@ pub LGeneratorList: Vec<ast::UserGen> = {
 };
 
 LGenerator: ast::UserGen = {
-"generator" <nm: LName> <tyname: LType> <stlist: LState+> => {
+"generator" <nm: LGeneratorName> <tyname: LType> <stlist: LState+> => {
 	let typ: Type = util::type_from_str(tyname.as_str());
 	ast::UserGen::new(typ, &stlist)
 }
 };
 
-LName: String = {
+LGeneratorName: String = {
 	<nm: r"std:[[:word:]]+"> => nm.to_string(),
 	<nm: r"[[:alpha:]][[:word:]]+"> => { nm.to_string() },
 };
