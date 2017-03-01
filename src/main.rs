@@ -353,7 +353,7 @@ fn main() {
 		use std::io::Read;
 		fp.read_to_string(&mut s).unwrap();
 		let stdgen = match usergen::parse_LGeneratorList(s.as_str()) {
-			Err(e) => panic!("err: {:?}", e),
+			Err(e) => panic!("err reading {:?}: {:?}", p, e),
 			Ok(a) => a,
 		};
 		for sgen in stdgen {
@@ -384,23 +384,23 @@ mod test {
 
 	#[test]
 	fn parse_generator() {
-		let s = "generator I32 1 state:86 i32:constant(42)";
+		let s = "generator name I32 state i32:constant(42)";
 		assert!(usergen::parse_LGeneratorList(s).is_ok());
 	}
 	#[test]
 	fn minexpr() {
-		let s = "generator U8 1 state:0 u8:min()";
+		let s = "generator name U8 state u8:min()";
 		assert!(usergen::parse_LGeneratorList(s).is_ok());
 	}
 	#[test]
 	fn maxexpr() {
-		let s = "generator U16 1 state:0 u16:max()";
+		let s = "generator name U16 state u16:max()";
 		assert!(usergen::parse_LGeneratorList(s).is_ok());
 	}
 
 	#[test]
 	fn randexpr_constants() {
-		let s = "generator U32 1 state:0 u32:random(i32:constant(1),";
+		let s = "generator name U32 state u32:random(i32:constant(1),";
 		let s = s.to_string() + "i32:constant(32768))";
 		let t = s.as_str();
 		assert!(usergen::parse_LGeneratorList(t).is_ok());
@@ -408,15 +408,15 @@ mod test {
 
 	#[test]
 	fn randexpr_min_max() {
-		let s = "generator U32 1 state:0 u32:random(i32:min(), i32:max())";
+		let s = "generator name U32 state u32:random(i32:min(), i32:max())";
 		assert!(usergen::parse_LGeneratorList(s).is_ok());
 	}
 
 	#[test]
 	fn randexpr_complex() {
 		let s =
-			"generator i32 1".to_string() +
-			"state:5 i32:random(i32:max() / i32:constant(2), i32:constant(1))";
+			"generator name i32\n".to_string() +
+			"state i32:random(i32:max() / i32:constant(2), i32:constant(1))";
 		match usergen::parse_LGeneratorList(s.as_str()) {
 			Ok(_) => {},
 			Err(e) => panic!("err: {:?}", e),
@@ -426,8 +426,8 @@ mod test {
 	#[test]
 	fn randexpr_compound_both_clauses() {
 		let s =
-			"generator i32 1".to_string() +
-			"state:5 i32:random(i32:max() * i32:constant(2), " +
+			"generator name i32\n".to_string() +
+			"state i32:random(i32:max() * i32:constant(2), " +
 			"i32:min()+i32:constant(1)*i32:constant(2))";
 		match usergen::parse_LGeneratorList(s.as_str()) {
 			Ok(_) => {},
@@ -438,8 +438,8 @@ mod test {
 	#[test]
 	fn randexpr_full() { // random() expression with compound sides
 		let s =
-			"generator i32 1".to_string() +
-			"state:5 i32:random(i32:max() / i32:constant(2), " +
+			"generator name i32\n".to_string() +
+			"state i32:random(i32:max() / i32:constant(2), " +
 			"i32:max()-i32:constant(1))";
 		match usergen::parse_LGeneratorList(s.as_str()) {
 			Ok(_) => {},
@@ -449,7 +449,7 @@ mod test {
 
 	#[test]
 	fn multiple_states() {
-		let s = "generator u64 2 state:0 u64:min() state:1 u64:max()";
+		let s = "generator name u64 state u64:min() state u64:max()";
 		match usergen::parse_LGeneratorList(s) {
 			Ok(_) => {},
 			Err(e) => panic!("err: {:?}", e),
@@ -459,7 +459,7 @@ mod test {
 	#[test]
 	fn gen_interp_constant() {
 		use variable::Generator;
-		let s = "generator u8 1 state:0 u8:min()";
+		let s = "generator name u8 state u8:min()";
 		let mut ugen = match usergen::parse_LGeneratorList(s) {
 			Ok(prs) => prs,
 			Err(e) => panic!("parse error: {:?}", e),
@@ -471,30 +471,39 @@ mod test {
 	#[test]
 	fn gen_interp_compound() { // compound expression interpretation
 		use variable::Generator;
-		let mut s = "generator u8 1 state:0 u8:constant(4)+u8:constant(6)";
+		let mut s = "generator name u8 state u8:constant(4)+u8:constant(6)";
 		let v = usergen::parse_LGeneratorList(s).unwrap()[0].value();
 		assert_eq!(v, "10");
-		s = "generator u8 1 state:0 u8:constant(8)-u8:constant(6)";
+		s = "generator name u8 state u8:constant(8)-u8:constant(6)";
 		assert_eq!(usergen::parse_LGeneratorList(s).unwrap()[0].value(), "2");
 
-		s = "generator u8 1 state:0 u8:constant(4)*u8:constant(5)";
+		s = "generator name u8 state u8:constant(4)*u8:constant(5)";
 		assert_eq!(usergen::parse_LGeneratorList(s).unwrap()[0].value(), "20");
 
-		s = "generator u8 1 state:0 u8:constant(12)/u8:constant(2)";
+		s = "generator name u8 state u8:constant(12)/u8:constant(2)";
 		assert_eq!(usergen::parse_LGeneratorList(s).unwrap()[0].value(), "6");
 
-		s = "generator u8 1 state:0 u8:constant(5) % u8:constant(2)";
+		s = "generator name u8 state u8:constant(5) % u8:constant(2)";
 		assert_eq!(usergen::parse_LGeneratorList(s).unwrap()[0].value(), "1");
+	}
+
+	#[test]
+	fn names() {
+		let mut s = "generator nm_1 i32 state i32:constant(6)\n".to_string();
+		assert_eq!(usergen::parse_LGeneratorList(s.as_str()).unwrap().len(), 1);
+
+		s = "generator std:help i32 state i32:constant(6)\n".to_string();
+		assert_eq!(usergen::parse_LGeneratorList(s.as_str()).unwrap().len(), 1);
 	}
 
 	#[test]
 	fn multi_gen() {
 		let s =
-			"generator i32 1\n".to_string() +
-			"state:0 i32:random(i32:min(), i32:max())\n" +
-			"generator u32 2\n" +
-			"state:0 u32:min()" +
-			"state:1 u32:max()";
+			"generator name i32\n".to_string() +
+			"state i32:random(i32:min(), i32:max())\n" +
+			"generator second_name u32\n" +
+			"state u32:min()" +
+			"state u32:max()";
 			assert_eq!(usergen::parse_LGeneratorList(s.as_str()).unwrap().len(), 2);
 	}
 }
