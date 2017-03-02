@@ -506,4 +506,24 @@ mod test {
 			"state u32:max()";
 			assert_eq!(usergen::parse_LGeneratorList(s.as_str()).unwrap().len(), 2);
 	}
+
+	#[test]
+	fn gen_types() {
+		let s = "generator name u8 state u8:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name u16 state u16:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name u32 state u32:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name u64 state u64:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name i8 state i8:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name i16 state i16:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name i32 state i32:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+		let s = "generator name i64 state i64:max()";
+		assert_eq!(usergen::parse_LGeneratorList(s).unwrap().len(), 1);
+	}
 }
