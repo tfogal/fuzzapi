@@ -12,7 +12,7 @@ pub LGeneratorList: Vec<ast::UserGen> = {
 LGenerator: ast::UserGen = {
 "generator" <nm: LGeneratorName> <tyname: LType> <stlist: LState+> => {
 	let typ: Type = util::type_from_str(tyname.as_str());
-	ast::UserGen::new(typ, &stlist)
+	ast::UserGen::new(typ, &nm, &stlist)
 }
 };
 

@@ -281,6 +281,16 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 	return Ok(());
 }
 
+fn usergen(nm: &str, generators: Vec<ast::UserGen>) ->
+	Option<Box<variable::Generator>> {
+	for gen in generators {
+		if gen.name == nm {
+			return Some(Box::new(gen));
+		}
+	}
+	return None;
+}
+
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
@@ -352,13 +362,16 @@ fn main() {
 		let mut s = String::new();
 		use std::io::Read;
 		fp.read_to_string(&mut s).unwrap();
-		let stdgen = match usergen::parse_LGeneratorList(s.as_str()) {
+		let lgen = usergen::parse_LGeneratorList(s.as_str());
+		let stdgen: Vec<ast::UserGen> = match lgen {
 			Err(e) => panic!("err reading {:?}: {:?}", p, e),
 			Ok(a) => a,
 		};
-		for sgen in stdgen {
-			println!("parsed: {:?}", Box::new(sgen));
-		}
+		let stdi64 = match usergen("std:i64", stdgen) {
+			None => panic!("could not find 'std:i64' in std generator list!"),
+			Some(x) => x,
+		};
+		println!("usergen parsed: {:?}", stdi64);
 	}
 
 	while !finished(&immut) {

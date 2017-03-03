@@ -13,13 +13,15 @@ pub enum Opcode {
 
 pub struct UserGen {
 	ty: Type,
+	pub name: String,
 	states: Vec<Expression>,
 	idx: usize,
 	rng: rand::ThreadRng,
 }
 impl UserGen {
-	pub fn new(t: Type, stlist: &Vec<Expression>) -> Self {
-		UserGen{ty: t, states: (*stlist).clone(), idx: 0, rng: rand::thread_rng()}
+	pub fn new(t: Type, nm: &String, stlist: &Vec<Expression>) -> Self {
+		UserGen{ty: t, name: nm.clone(), states: (*stlist).clone(),
+		        idx: 0, rng: rand::thread_rng()}
 	}
 
 	fn typed_min(t: &Type) -> String {
@@ -166,7 +168,7 @@ impl ::variable::Generator for UserGen {
 	fn reset(&mut self) { self.idx = 0; }
 
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "UserGen{{{:?}, state {} of {}: {{\n", self.ty,
+		write!(f, "{}{{{:?}, state {} of {}: {{\n", self.name, self.ty,
 		       self.idx, self.states.len()).unwrap();
 		for state in self.states.iter() {
 			write!(f, "\t{:?}\n", state).unwrap();
