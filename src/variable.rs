@@ -30,16 +30,23 @@ impl Source {
 			fqn: "".to_string(),
 		}))
 	}
-	// Similar construction, but this takes an explicit generator for when the
-	// default one for the type is inappropriate.
-	pub fn free_gen(nm: &str, gen: Box<Generator>, o: ScalarOp) ->
-		Rc<RefCell<Source>> {
+
+	// Construct a free variable that uses the generator named 'gen' obtained via
+	// lookup in 'list'.
+	pub fn free_gen(nm: &str, gen: &str, list: &Vec<Box<Generator>>,
+	                     o: ScalarOp) -> Rc<RefCell<Source>> {
+		let g: Box<Generator> = match generator_list(gen, &list) {
+			None => panic!("No generator named '{}'.  Known generators: {:?}", gen,
+			               gennames(&list)),
+			Some(x) => x,
+		};
 		Rc::new(RefCell::new(Source{
-			name: nm.to_string(), generator: gen, op: o,
+			name: nm.to_string(), generator: g, op: o,
 			parent: Vec::new(),
 			fqn: "".to_string(),
 		}))
 	}
+
 	pub fn is_free(&self) -> bool {
 		// Both free and return variables have names; but free variables won't have
 		// an associated function.
@@ -79,6 +86,14 @@ impl Name for Source {
 	}
 }
 
+fn gennames(gens: &Vec<Box<Generator>>) -> Vec<String> {
+	let mut rv: Vec<String> = Vec::new();
+	for g in gens {
+		rv.push(g.name());
+	}
+	rv
+}
+
 // A variable has a root type, but when used in functions it may need to be
 // transformed in some way.  The classic example is a stack variable that needs
 // address-of to be passed to a method that accepts it by pointer.
@@ -102,7 +117,7 @@ impl ToString for ScalarOp {
 // class of all values by knowing where we are in that sequence.
 pub trait Generator {
 	// The name of this generator, as a user might invoke it.
-	fn name(&self) -> &str;
+	fn name(&self) -> String;
 
 	// Grabs the current state as an expression.
 	fn value(&mut self) -> String;
@@ -115,6 +130,9 @@ pub trait Generator {
 	fn reset(&mut self);
 
 	fn dbg(&self, &mut fmt::Formatter) -> fmt::Result;
+
+	// Workaround because we can't clone() a trait, or a Box<> of one.
+	fn clone(&self) -> Box<Generator>;
 }
 
 use std::fmt;
@@ -140,13 +158,29 @@ pub fn generator(t: &Type) -> Box<Generator> {
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
 		&Type::Field(_, ref x) => generator(x),
 		&Type::Usize => Box::new(GenUsize::create(t)),
-		&Type::UDT(_, _) => Box::new(GenUDT::create(t)),
+		&Type::UDT(_, ref flds) => {
+			if flds.len() == 0 {
+				Box::new(GenOpaque::create(t))
+			} else {
+				Box::new(GenUDT::create(t))
+			}
+		},
 		&Type::Integer => {
 			println!("WARNING: using I32 generator for integer!");
 			Box::new(GenI32::create(t))
 		}
 		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
+}
+
+pub fn generator_list<'a>(nm: &str, generators: &'a Vec<Box<Generator>>) ->
+	Option<Box<Generator>> {
+	for gen in generators {
+		if gen.name() == nm {
+			return Some((*gen).clone());
+		}
+	}
+	return None;
 }
 
 //---------------------------------------------------------------------
@@ -161,7 +195,7 @@ pub struct GenNothing {}
 // the end?  Then we could do things like sum up all n_state()s in the tree of
 // functions and have it make sense ...
 impl Generator for GenNothing {
-	fn name(&self) -> &str { "std:nothing" }
+	fn name(&self) -> String { "std:nothing".to_string() }
 	fn value(&mut self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
@@ -170,6 +204,7 @@ impl Generator for GenNothing {
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "(none)")
 	}
+	fn clone(&self) -> Box<Generator> { Box::new(GenNothing{}) }
 }
 
 // Sometimes we have a "free" variable that is actually an opaque pointer and
@@ -186,7 +221,9 @@ impl GenOpaque {
 }
 
 impl Generator for GenOpaque {
-	fn name(&self) -> &str { "std:opaque" }
+	fn name(&self) -> String {
+		"std:opaque:".to_string() + self.ty.name().as_str()
+	}
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -200,22 +237,25 @@ impl Generator for GenOpaque {
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "(opaque-none)")
 	}
+	fn clone(&self) -> Box<Generator> { Box::new(GenOpaque{ty: self.ty.clone()}) }
 }
 
 #[derive(Debug)]
 pub struct GenEnum {
+	name: String,
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
 }
 
 impl GenEnum {
 	pub fn create(t: &Type) -> Self {
-		GenEnum{cls: TC_Enum::new(t), idx: 0}
+		GenEnum{name: "std:enum:".to_string() + t.name().as_str(),
+		        cls: TC_Enum::new(t), idx: 0}
 	}
 }
 
 impl Generator for GenEnum {
-	fn name(&self) -> &str { "std:enum" }
+	fn name(&self) -> String { self.name.clone() }
 	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -236,6 +276,10 @@ impl Generator for GenEnum {
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "enum{{{} of {}}}", self.idx, self.cls.n())
 	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenEnum{name: self.name.clone(), cls: self.cls.clone(),
+		                 idx: self.idx})
+	}
 }
 
 #[derive(Debug)]
@@ -251,7 +295,7 @@ impl GenI32 {
 }
 
 impl Generator for GenI32 {
-	fn name(&self) -> &str { "std:I32orig" }
+	fn name(&self) -> String { "std:I32orig".to_string() }
 	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -272,6 +316,9 @@ impl Generator for GenI32 {
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "i32{{{} of {}}}", self.idx, self.cls.n())
 	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenI32{cls: self.cls.clone(), idx: self.idx})
+	}
 }
 
 #[derive(Debug)]
@@ -287,7 +334,7 @@ impl GenUsize {
 }
 
 impl Generator for GenUsize {
-	fn name(&self) -> &str { "std:Usizeorig" }
+	fn name(&self) -> String { "std:usize".to_string() }
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -310,6 +357,9 @@ impl Generator for GenUsize {
 	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "usize{{{} of {}}}", self.idx, self.cls.n())
+	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenUsize{cls: self.cls.clone(), idx: self.idx})
 	}
 }
 
@@ -343,10 +393,18 @@ impl GenUDT {
 			idx: (0..nval).map(|_| 0).collect(),
 		}
 	}
+
+	fn clone_values(&self) -> Vec<Box<Generator>> {
+		let mut rv: Vec<Box<Generator>> = Vec::new();
+		for v in self.values.iter() {
+			rv.push((*v).clone());
+		}
+		return rv;
+	}
 }
 
 impl Generator for GenUDT {
-	fn name(&self) -> &str { "std:UDT" }
+	fn name(&self) -> String { "std:UDT".to_string() }
 	fn value(&mut self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
@@ -406,6 +464,10 @@ impl Generator for GenUDT {
 		}
 		write!(f, "}}")
 	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenUDT{types: self.types.clone(),
+		                values: self.clone_values(), idx: self.idx.clone()})
+	}
 }
 
 #[derive(Debug)]
@@ -426,7 +488,7 @@ impl GenPointer {
 }
 
 impl Generator for GenPointer {
-	fn name(&self) -> &str { "std:pointer" }
+	fn name(&self) -> String { "std:pointer".to_string() }
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -444,6 +506,10 @@ impl Generator for GenPointer {
 	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "ptr{{{} of {}}}", self.idx, self.cls.n())
+	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenPointer{ty: self.ty.clone(), cls: self.cls.clone(),
+		                    idx: self.idx})
 	}
 }
 
@@ -504,7 +570,7 @@ impl GenCString {
 }
 
 impl Generator for GenCString {
-	fn name(&self) -> &str { "std:cstring" }
+	fn name(&self) -> String { "std:cstring".to_string() }
 	fn value(&mut self) -> String {
 		// special case null, so that we can wrap all other cases in "".
 		if self.idx == 0 {
@@ -571,5 +637,9 @@ impl Generator for GenCString {
 	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "cstr{{{} of {}}}", self.idx, 8)
+	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenCString{idx: self.idx, printable: self.printable.clone(),
+		                    control: self.control.clone()})
 	}
 }

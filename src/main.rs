@@ -289,19 +289,67 @@ fn tobox(orig: Vec<ast::UserGen>) -> Vec<Box<variable::Generator>> {
 	return rv;
 }
 
-fn usergen<'a>(nm: &str, generators: &'a Vec<Box<variable::Generator>>) ->
-	Option<&'a Box<variable::Generator>> {
-	for gen in generators {
-		if gen.name() == nm {
-			return Some(gen);
-		}
-	}
-	return None;
+// instantiate generators for builtin, non-parameterized types.
+fn builtin_generators() -> Vec<Box<variable::Generator>> {
+	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
+
+	rv.push(Box::new(variable::GenNothing{}));
+	rv.push(Box::new(variable::GenI32::create(&Type::I32)));
+	rv.push(Box::new(variable::GenUsize::create(&Type::Usize)));
+	rv.push(variable::generator(&Type::Integer));
+
+	return rv;
+}
+
+// instantiate generators specific to the hash test case infrastructure
+fn hash_generators() -> Vec<Box<variable::Generator>> {
+	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
+
+	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
+	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
+	rv.push(Box::new(variable::GenOpaque::create(&hs_data_ptr)));
+
+	let char_ptr = Type::Pointer(Box::new(Type::Character));
+	let void_ptr = Type::Pointer(Box::new(Type::Void));
+	let entry = Type::UDT("ENTRY".to_string(),
+		vec![Box::new(Type::Field("key".to_string(), Box::new(char_ptr))),
+		     Box::new(Type::Field("data".to_string(), Box::new(void_ptr)))]
+	);
+	rv.push(variable::generator(&entry));
+	rv.push(variable::generator(&Type::Pointer(Box::new(entry))));
+
+	let mut action_values: BTreeMap<String, u32> = BTreeMap::new();
+	action_values.insert("FIND".to_string(), 0);
+	action_values.insert("ENTER".to_string(), 1);
+	let action = Type::Enum("ACTION".to_string(), action_values);
+	rv.push(variable::generator(&action));
+	return rv;
 }
 
 fn main() {
 	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
+
+	let mut generators: Vec<Box<variable::Generator>> = {
+		let p = Path::new("../share/stdgen.hf"); // todo: search path for hf files
+		let mut fp = match File::open(&p) {
+			Err(e) => panic!("error reading fuzz: {}", e),
+			Ok(f) => f,
+		};
+		let mut s = String::new();
+		use std::io::Read;
+		fp.read_to_string(&mut s).unwrap();
+		let lgen = usergen::parse_LGeneratorList(s.as_str());
+		let stdgen: Vec<ast::UserGen> = match lgen {
+			Err(e) => panic!("err reading {:?}: {:?}", p, e),
+			Ok(a) => a,
+		};
+		tobox(stdgen)
+	};
+	generators.append(&mut builtin_generators());
+	generators.append(&mut hash_generators());
+	let generators: Vec<Box<variable::Generator>> = generators; // drop mut.
+
 	let char_ptr = Type::Pointer(Box::new(Type::Character));
 	let void_ptr = Type::Pointer(Box::new(Type::Void));
 	let entry = Type::UDT("ENTRY".to_string(),
@@ -314,10 +362,11 @@ fn main() {
 	let action = Type::Enum("ACTION".to_string(), action_values);
 
 	use variable::ScalarOp;
-	let nel = variable::Source::free("nel", &Type::Usize, ScalarOp::Null);
-	let hsd_var = variable::Source::free_gen("tbl",
-		Box::new(variable::GenOpaque::create(&hs_data_ptr)), ScalarOp::AddressOf
-	);
+	let nel = variable::Source::free_gen("nel", "std:usize", &generators,
+	                                     ScalarOp::Null);
+	let genname = "std:opaque:struct hsearch_data*";
+	let hsd_var = variable::Source::free_gen("tbl", genname,
+	                                         &generators, ScalarOp::AddressOf);
 	let fa1 = Argument::new(&Type::Usize, nel);
 	let fa2 = Argument::new(&hs_data, hsd_var.clone());
 	let hcreate_args = vec![fa1, fa2];
@@ -330,7 +379,8 @@ fn main() {
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
 //                     struct hsearch_data *htab);
 	let item = variable::Source::free("item", &entry.clone(), ScalarOp::Null);
-	let actvar = variable::Source::free("action", &action, ScalarOp::Null);
+	let actvar = variable::Source::free_gen("action", "std:enum:ACTION",
+	                                        &generators, ScalarOp::Null);
 	let entryp = Type::Pointer(Box::new(entry.clone()));
 	let rv = variable::Source::free("retval", &entryp, ScalarOp::AddressOf);
 	let htab = variable::Source::bound(hsd_var.clone(), ScalarOp::AddressOf);
@@ -358,30 +408,6 @@ fn main() {
 			return n*narg;
 		});
 		println!("{} states to test.", nstates);
-	}
-
-	{
-		// todo: search path for hf files.
-		let p = Path::new("../share/stdgen.hf");
-		let mut fp = match File::open(&p) {
-			Err(e) => panic!("error reading fuzz: {}", e),
-			Ok(f) => f,
-		};
-		let mut s = String::new();
-		use std::io::Read;
-		fp.read_to_string(&mut s).unwrap();
-		let lgen = usergen::parse_LGeneratorList(s.as_str());
-		let stdgen: Vec<ast::UserGen> = match lgen {
-			Err(e) => panic!("err reading {:?}: {:?}", p, e),
-			Ok(a) => a,
-		};
-		let mut stdgen: Vec<Box<variable::Generator>> = tobox(stdgen);
-		stdgen.push(variable::generator(&Type::Integer));
-		let stdi64 = match usergen("std:i64", &stdgen) {
-			None => panic!("could not find 'std:i64' in std generator list!"),
-			Some(x) => x,
-		};
-		println!("usergen parsed: {:?}", stdi64);
 	}
 
 	while !finished(&immut) {

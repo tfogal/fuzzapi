@@ -152,7 +152,7 @@ impl fmt::Debug for Constant {
 }
 
 impl ::variable::Generator for UserGen {
-	fn name(&self) -> &str { self.name.as_str() }
+	fn name(&self) -> String { self.name.clone() }
 	fn value(&mut self) -> String {
 		let i = self.idx;
 		let expr: Expression = self.states[i].clone();
@@ -174,5 +174,10 @@ impl ::variable::Generator for UserGen {
 			write!(f, "\t{:?}\n", state).unwrap();
 		}
 		write!(f, "}}}}")
+	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(UserGen{ty: self.ty.clone(), name: self.name.clone(),
+		                 states: self.states.clone(),
+		                 idx: self.idx, rng: self.rng.clone()})
 	}
 }
