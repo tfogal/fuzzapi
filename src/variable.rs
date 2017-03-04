@@ -101,6 +101,9 @@ impl ToString for ScalarOp {
 // A Generator holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in that sequence.
 pub trait Generator {
+	// The name of this generator, as a user might invoke it.
+	fn name(&self) -> &str;
+
 	// Grabs the current state as an expression.
 	fn value(&mut self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
@@ -158,6 +161,7 @@ pub struct GenNothing {}
 // the end?  Then we could do things like sum up all n_state()s in the tree of
 // functions and have it make sense ...
 impl Generator for GenNothing {
+	fn name(&self) -> &str { "std:nothing" }
 	fn value(&mut self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
@@ -182,6 +186,7 @@ impl GenOpaque {
 }
 
 impl Generator for GenOpaque {
+	fn name(&self) -> &str { "std:opaque" }
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -210,6 +215,7 @@ impl GenEnum {
 }
 
 impl Generator for GenEnum {
+	fn name(&self) -> &str { "std:enum" }
 	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -245,6 +251,7 @@ impl GenI32 {
 }
 
 impl Generator for GenI32 {
+	fn name(&self) -> &str { "std:I32orig" }
 	fn value(&mut self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -280,6 +287,7 @@ impl GenUsize {
 }
 
 impl Generator for GenUsize {
+	fn name(&self) -> &str { "std:Usizeorig" }
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -338,6 +346,7 @@ impl GenUDT {
 }
 
 impl Generator for GenUDT {
+	fn name(&self) -> &str { "std:UDT" }
 	fn value(&mut self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
@@ -417,6 +426,7 @@ impl GenPointer {
 }
 
 impl Generator for GenPointer {
+	fn name(&self) -> &str { "std:pointer" }
 	fn value(&mut self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
@@ -494,6 +504,7 @@ impl GenCString {
 }
 
 impl Generator for GenCString {
+	fn name(&self) -> &str { "std:cstring" }
 	fn value(&mut self) -> String {
 		// special case null, so that we can wrap all other cases in "".
 		if self.idx == 0 {

@@ -281,11 +281,19 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 	return Ok(());
 }
 
-fn usergen(nm: &str, generators: Vec<ast::UserGen>) ->
-	Option<Box<variable::Generator>> {
+fn tobox(orig: Vec<ast::UserGen>) -> Vec<Box<variable::Generator>> {
+	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
+	for v in orig.iter() {
+		rv.push(Box::new((*v).clone()));
+	}
+	return rv;
+}
+
+fn usergen<'a>(nm: &str, generators: &'a Vec<Box<variable::Generator>>) ->
+	Option<&'a Box<variable::Generator>> {
 	for gen in generators {
-		if gen.name == nm {
-			return Some(Box::new(gen));
+		if gen.name() == nm {
+			return Some(gen);
 		}
 	}
 	return None;
@@ -367,7 +375,9 @@ fn main() {
 			Err(e) => panic!("err reading {:?}: {:?}", p, e),
 			Ok(a) => a,
 		};
-		let stdi64 = match usergen("std:i64", stdgen) {
+		let mut stdgen: Vec<Box<variable::Generator>> = tobox(stdgen);
+		stdgen.push(variable::generator(&Type::Integer));
+		let stdi64 = match usergen("std:i64", &stdgen) {
 			None => panic!("could not find 'std:i64' in std generator list!"),
 			Some(x) => x,
 		};

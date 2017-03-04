@@ -11,6 +11,7 @@ pub enum Opcode {
 	Add, Sub, Mul, Div, Mod,
 }
 
+#[derive(Clone)]
 pub struct UserGen {
 	ty: Type,
 	pub name: String,
@@ -150,9 +151,8 @@ impl fmt::Debug for Constant {
 	}
 }
 
-	//pub ty: Type,
-	//pub states: Vec<Expression>,
 impl ::variable::Generator for UserGen {
+	fn name(&self) -> &str { self.name.as_str() }
 	fn value(&mut self) -> String {
 		let i = self.idx;
 		let expr: Expression = self.states[i].clone();
