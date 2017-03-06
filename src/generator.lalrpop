@@ -1,18 +1,18 @@
 use std::str::FromStr;
-use ast;
 use typ::*;
+use usergen;
 use util;
 
 grammar;
 
-pub LGeneratorList: Vec<ast::UserGen> = {
+pub LGeneratorList: Vec<usergen::UserGen> = {
 	<ugenlist: LGenerator+> => ugenlist,
 };
 
-LGenerator: ast::UserGen = {
+LGenerator: usergen::UserGen = {
 "generator" <nm: LGeneratorName> <tyname: LType> <stlist: LState+> => {
 	let typ: Type = util::type_from_str(tyname.as_str());
-	ast::UserGen::new(typ, &nm, &stlist)
+	usergen::UserGen::new(typ, &nm, &stlist)
 }
 };
 
@@ -33,33 +33,33 @@ LType: String = {
 	"U64" => "U64".to_string(), "u64" => "u64".to_string(),
 };
 
-LState: ast::Expression = {
+LState: usergen::Expression = {
 	"state" <exp: LExpression> => exp
 };
 
-LExpression: ast::Expression = {
+LExpression: usergen::Expression = {
 	<lt: LType> ":" "constant" "(" <num: LNum> ")" => {
 		if lt == "string" {
-			let scnst = ast::Constant::String(lt.to_string());
-			return ast::Expression::ConstExpr(scnst);
+			let scnst = usergen::Constant::String(lt.to_string());
+			return usergen::Expression::ConstExpr(scnst);
 		}
 		let typ = util::type_from_str(lt.as_str());
-		let cnsttype: ast::Constant = match typ {
+		let cnsttype: usergen::Constant = match typ {
 			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
-				ast::Constant::Signed(num),
+				usergen::Constant::Signed(num),
 			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
 			Type::Unsigned =>
-				ast::Constant::Unsigned(num as u64),
+				usergen::Constant::Unsigned(num as u64),
 			_ => panic!("unhandled type '{:?}'", typ),
 		};
-		ast::Expression::ConstExpr(cnsttype)
+		usergen::Expression::ConstExpr(cnsttype)
 	},
 	<lt: LType> ":" "min" "(" ")" =>
-		ast::Expression::MinExpr(util::type_from_str(lt.as_str())),
+		usergen::Expression::MinExpr(util::type_from_str(lt.as_str())),
 	<lt: LType> ":" "max" "(" ")" =>
-		ast::Expression::MaxExpr(util::type_from_str(lt.as_str())),
+		usergen::Expression::MaxExpr(util::type_from_str(lt.as_str())),
 	<lt: LType> ":" "random" "(" <low: LExpression> "," <high: LExpression> ")" =>
-		ast::Expression::RandomExpr(util::type_from_str(lt.as_str()),
+		usergen::Expression::RandomExpr(util::type_from_str(lt.as_str()),
 		                               Box::new(low), Box::new(high)),
 	// Ugh.  LALRPop is broken in that it doesn't let us specify operator
 	// precedence.
@@ -69,41 +69,41 @@ LExpression: ast::Expression = {
 	// allow all of the above expressions as the RHS of all the following
 	// expressions, and such recursion *requires* precedence specification.
 	<left: LExpression> "+" <right: LFactor> =>
-		ast::Expression::Compound(Box::new(left), ast::Opcode::Add,
+		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Add,
 		                             Box::new(right)),
 	<left: LExpression> "-" <right: LFactor> =>
-		ast::Expression::Compound(Box::new(left), ast::Opcode::Sub,
+		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Sub,
 		                             Box::new(right)),
 	<left: LExpression> "/" <right: LTerm> =>
-		ast::Expression::Compound(Box::new(left), ast::Opcode::Div,
+		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Div,
 		                             Box::new(right)),
 	<left: LExpression> "*" <right: LTerm> =>
-		ast::Expression::Compound(Box::new(left), ast::Opcode::Mul,
+		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Mul,
 		                             Box::new(right)),
 	<left: LFactor> "%" <right: LTerm> =>
-		ast::Expression::Compound(Box::new(left), ast::Opcode::Mod,
+		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Mod,
 		                             Box::new(right)),
 };
 
-LFactor: ast::Expression = {
+LFactor: usergen::Expression = {
 	<lt: LTerm> => lt,
 };
 
-LTerm: ast::Expression = {
+LTerm: usergen::Expression = {
 	<lt: LType> ":" "constant" "(" <num: LNum> ")" => {
 		if lt == "string" {
 			panic!("Strings can't be part of compound expressions.");
 		}
 		let typ = util::type_from_str(lt.as_str());
-		let cnsttype: ast::Constant = match typ {
+		let cnsttype: usergen::Constant = match typ {
 			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
-				ast::Constant::Signed(num),
+				usergen::Constant::Signed(num),
 			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
 			Type::Unsigned =>
-				ast::Constant::Unsigned(num as u64),
+				usergen::Constant::Unsigned(num as u64),
 			_ => panic!("unhandled type '{:?}'", typ),
 		};
-		ast::Expression::ConstExpr(cnsttype)
+		usergen::Expression::ConstExpr(cnsttype)
 	},
 };
 

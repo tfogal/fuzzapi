@@ -1,18 +1,19 @@
+extern crate rand;
 use std::collections::btree_map::BTreeMap;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
 use std::process::Command;
-extern crate rand;
-mod ast;
 mod function;
 mod generator;
 mod tc;
 mod typ;
+mod usergen;
 mod util;
 mod variable;
 use function::*;
 use typ::*;
+use usergen::UserGen;
 
 macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
@@ -281,7 +282,7 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 	return Ok(());
 }
 
-fn tobox(orig: Vec<ast::UserGen>) -> Vec<Box<variable::Generator>> {
+fn tobox(orig: Vec<UserGen>) -> Vec<Box<variable::Generator>> {
 	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
 	for v in orig.iter() {
 		rv.push(Box::new((*v).clone()));
@@ -340,7 +341,7 @@ fn main() {
 		use std::io::Read;
 		fp.read_to_string(&mut s).unwrap();
 		let lgen = generator::parse_LGeneratorList(s.as_str());
-		let stdgen: Vec<ast::UserGen> = match lgen {
+		let stdgen: Vec<UserGen> = match lgen {
 			Err(e) => panic!("err reading {:?}: {:?}", p, e),
 			Ok(a) => a,
 		};
