@@ -1,0 +1,77 @@
+use api;
+
+grammar;
+
+pub L_API : Vec<api::Declaration> = {
+	<decllist: LDeclaration+> => {
+		// todo fixme: garbage, this should be more than a list of declarations,
+		// code should follow
+		decllist
+	},
+};
+
+LDeclaration: api::Declaration = {
+	"struct" <nm: LIdentifier> "{" <fields: LField*> "}" => {
+		let udt = api::DeclType::UDT(fields);
+		api::Declaration{name: nm, ty: udt}
+	},
+	"enum" <nm: LIdentifier> "{" <constants: LConstant+> "}" => {
+		api::Declaration{name: nm, ty: api::DeclType::Enum(constants)}
+	},
+};
+
+LIdentifier: String = {
+	<nm: r"[[:alpha:]]+[[:alnum:]]*"> => nm.to_string(),
+};
+
+LField: api::Declaration = {
+	"pointer" <blt: LSimpleType> <name: LIdentifier> ";" => {
+		let ptr = api::Native::Pointer(Box::new(blt));
+		api::Declaration{name: name, ty: api::DeclType::Builtin(ptr)}
+	},
+	<blt: LSimpleType> <name: LIdentifier> ";" => {
+		api::Declaration{name: name, ty: api::DeclType::Builtin(blt)}
+	},
+	"struct" <ty: LIdentifier> <name: LIdentifier> ";" => {
+		// todo fixme type Native::U8 is bullshit.
+		//api::Declaration{name: name, ty: api::DeclType::Builtin(api::Native::U8)}
+		let udt = api::DeclType::UDTRef(name);
+		api::Declaration{name: ty, ty: udt}
+	},
+	"enum" <ty: LIdentifier> <name: LIdentifier> ";" => {
+		api::Declaration{name: ty, ty: api::DeclType::EnumRef(name)}
+	}
+};
+
+LSimpleType: api::Native = {
+	"u8" => api::Native::U8, "u16" => api::Native::U16,
+	"u32" => api::Native::U32, "u64" => api::Native::U64,
+	"usize" => api::Native::Usize,
+	"i8" => api::Native::I8, "i16" => api::Native::I16,
+	"i32" => api::Native::I32, "i64" => api::Native::I64,
+	"int" => api::Native::Integer,
+	"char" => {
+		api::Native::Character
+	}
+};
+
+LConstant: api::EnumValue = {
+	<nm: LIdentifier> "=" <value: "-?[0-9]+"> => {
+		let v = match value.parse::<i64>() {
+			Err(e) => panic!("error parsing '{}' as an i64."),
+			Ok(x) => x,
+		};
+		(nm, v)
+/* this is our ideal definition of LConstant, but: LALRPOP ambiguity.
+LConstant: api::EnumValue = {
+	<nm: r"[A-Z]+[A-Z0-9]*"> "=" <value: r"-?[0-9]+"> => {
+		let v = match value.parse::<i64>() {
+			Err(e) => panic!("error parsing '{}' as an i64."),
+			Ok(x) => x,
+		};
+		EnumValue(nm.to_string(), v)
+	},
+};
+*/
+	}
+};
