@@ -50,9 +50,8 @@ LSimpleType: api::Native = {
 	"i8" => api::Native::I8, "i16" => api::Native::I16,
 	"i32" => api::Native::I32, "i64" => api::Native::I64,
 	"int" => api::Native::Integer,
-	"char" => {
-		api::Native::Character
-	}
+	"void" => api::Native::Void,
+	"char" => api::Native::Character,
 };
 
 LConstant: api::EnumValue = {
