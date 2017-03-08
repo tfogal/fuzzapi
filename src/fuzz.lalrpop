@@ -55,7 +55,7 @@ LSimpleType: api::Native = {
 };
 
 LConstant: api::EnumValue = {
-	<nm: LIdentifier> "=" <value: "-?[0-9]+"> => {
+	<nm: LIdentifier> "=" <value: "-?[0-9]+"> "," => {
 		let v = match value.parse::<i64>() {
 			Err(e) => panic!("error parsing '{}' as an i64."),
 			Ok(x) => x,

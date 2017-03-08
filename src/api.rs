@@ -119,4 +119,14 @@ mod test {
 			},
 		};
 	}
+
+	#[test]
+	fn test_enum_single() {
+		let s = "enum Enumeration { BLAH = 0 , }";
+		match fuzz::parse_L_API(s) {
+			Ok(_) => {},
+			Err(e) => panic!("error parsing: {:?}", e),
+		};
+		assert!(fuzz::parse_L_API(s).is_ok());
+	}
 }
