@@ -9,6 +9,7 @@ pub enum Native {
 
 pub type EnumValue = (String, i64);
 
+#[derive(Debug)]
 pub enum DeclType {
 	Builtin(Native),
 	UDT(Vec<Declaration>),
@@ -17,6 +18,7 @@ pub enum DeclType {
 	EnumRef(String),
 }
 
+#[derive(Debug)]
 pub struct Declaration {
 	pub name: String,
 	pub ty: DeclType,
@@ -125,8 +127,20 @@ mod test {
 		let s = "enum Enumeration { BLAH = 0 , }";
 		match fuzz::parse_L_API(s) {
 			Ok(_) => {},
-			Err(e) => panic!("error parsing: {:?}", e),
+			Err(e) => panic!("{:?}", e),
 		};
-		assert!(fuzz::parse_L_API(s).is_ok());
+		let t = "enum Enumeration { BLA = 0 , }";
+		assert!(fuzz::parse_L_API(t).is_ok());
+		assert_eq!(fuzz::parse_L_API(t).unwrap().len(), 1);
+	}
+
+	#[test]
+	fn test_enum_multi() {
+		let s = "enum Enumeration { FOO = 0 , BAR = 1 , BAZ = 42 , }";
+		let decls = match fuzz::parse_L_API(s) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		assert_eq!(decls.len(), 1);
 	}
 }
