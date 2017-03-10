@@ -2,21 +2,21 @@ use api;
 
 grammar;
 
-pub L_API : Vec<api::Declaration> = {
-	<decllist: LDeclaration+> => {
+pub L_API : Vec<api::UDTDecl> = {
+	<decllist: LUDTDecl+> => {
 		// todo fixme: garbage, this should be more than a list of declarations,
 		// code should follow
 		decllist
 	},
 };
 
-LDeclaration: api::Declaration = {
+LUDTDecl: api::UDTDecl = {
 	"struct" <nm: LIdentifier> "{" <fields: LField*> "}" => {
-		let udt = api::DeclType::UDT(fields);
-		api::Declaration{name: nm, ty: udt}
+		let udt = api::DeclType::Struct(fields);
+		api::UDTDecl{name: nm, ty: udt}
 	},
 	"enum" <nm: LIdentifier> "{" <constant: LConstant+> "}" => {
-		api::Declaration{name: nm, ty: api::DeclType::Enum(constant)}
+		api::UDTDecl{name: nm, ty: api::DeclType::Enum(constant)}
 	},
 };
 
@@ -24,22 +24,20 @@ LIdentifier: String = {
 	<nm: r"[[:alpha:]]+[[:alnum:]]*"> => nm.to_string(),
 };
 
-LField: api::Declaration = {
+LField: api::UDTDecl = {
 	"pointer" <blt: LSimpleType> <name: LIdentifier> ";" => {
 		let ptr = api::Native::Pointer(Box::new(blt));
-		api::Declaration{name: name, ty: api::DeclType::Builtin(ptr)}
+		api::UDTDecl{name: name, ty: api::DeclType::Builtin(ptr)}
 	},
 	<blt: LSimpleType> <name: LIdentifier> ";" => {
-		api::Declaration{name: name, ty: api::DeclType::Builtin(blt)}
+		api::UDTDecl{name: name, ty: api::DeclType::Builtin(blt)}
 	},
 	"struct" <ty: LIdentifier> <name: LIdentifier> ";" => {
-		// todo fixme type Native::U8 is bullshit.
-		//api::Declaration{name: name, ty: api::DeclType::Builtin(api::Native::U8)}
-		let udt = api::DeclType::UDTRef(name);
-		api::Declaration{name: ty, ty: udt}
+		let udt = api::DeclType::StructRef(name);
+		api::UDTDecl{name: ty, ty: udt}
 	},
 	"enum" <ty: LIdentifier> <name: LIdentifier> ";" => {
-		api::Declaration{name: ty, ty: api::DeclType::EnumRef(name)}
+		api::UDTDecl{name: ty, ty: api::DeclType::EnumRef(name)}
 	}
 };
 
