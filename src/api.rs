@@ -1,3 +1,5 @@
+use variable;
+
 #[derive(Debug, PartialEq)]
 pub enum Native {
 	U8, U16, U32, U64, Usize,
@@ -22,6 +24,18 @@ pub enum DeclType {
 pub struct UDTDecl {
 	pub name: String,
 	pub ty: DeclType,
+}
+
+pub struct FreeVarDecl {
+	pub name: String,
+	pub op: variable::ScalarOp,
+	pub genname: String,
+	pub ty: DeclType, // Struct(...) and Enum(...) are not valid, but *Refs are.
+}
+
+pub enum Declaration {
+	Free(FreeVarDecl),
+	UDT(UDTDecl),
 }
 
 #[cfg(test)]
@@ -137,6 +151,16 @@ mod test {
 	#[test]
 	fn test_enum_multi() {
 		let s = "enum Enumeration { FOO = 0 , BAR = 1 , BAZ = 42 , }";
+		let decls = match fuzz::parse_L_API(s) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		assert_eq!(decls.len(), 1);
+	}
+
+	#[test]
+	fn test_fvar_one() {
+		let s = "struct X { } var:free blah op:null gen:I32 i32";
 		let decls = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),

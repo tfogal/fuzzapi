@@ -1,9 +1,10 @@
 use api;
+use variable;
 
 grammar;
 
 pub L_API : Vec<api::UDTDecl> = {
-	<decllist: LUDTDecl+> => {
+	<decllist: LUDTDecl+> <fvarlist: LFreeVar*> => {
 		// todo fixme: garbage, this should be more than a list of declarations,
 		// code should follow
 		decllist
@@ -71,4 +72,21 @@ LConstant: api::EnumValue = {
 };
 */
 	}
+};
+
+LFreeVar: api::FreeVarDecl = {
+	"var" ":" "free" <id: LIdentifier> <oper: LOperation> "gen" ":"
+		<gen: LIdentifier> <ty: LSimpleType> => {
+		println!("var:free {} op:... {} {:?}", id, gen, ty);
+		let fauxtype = api::DeclType::Builtin(api::Native::Void);
+		api::FreeVarDecl{name: id, op: oper, genname: gen, ty: fauxtype}
+	}
+};
+
+LOperation: variable::ScalarOp = {
+	"op:null" => variable::ScalarOp::Null,
+	"op:*" => variable::ScalarOp::Deref,
+	"op:deref" => variable::ScalarOp::Deref,
+	"op:&" => variable::ScalarOp::AddressOf,
+	"op:addressof" => variable::ScalarOp::AddressOf,
 };
