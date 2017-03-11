@@ -48,7 +48,11 @@ mod test {
 		let s = "struct entry { }";
 		assert!(fuzz::parse_L_API(s).is_ok());
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
-		let ref decl: api::UDTDecl = fuzz::parse_L_API(s).unwrap()[0];
+		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
+		let decl = match decl {
+			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
+			&api::Declaration::UDT(ref udt) => udt,
+		};
 		assert_eq!(decl.name, "entry".to_string());
 		match decl.ty {
 			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
@@ -66,7 +70,11 @@ mod test {
 		let s = "struct Ent { pointer char key; }";
 		assert!(fuzz::parse_L_API(s).is_ok());
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
-		let ref decl: api::UDTDecl = fuzz::parse_L_API(s).unwrap()[0];
+		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
+		let decl = match decl {
+			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
+			&api::Declaration::UDT(ref udt) => udt,
+		};
 		assert_eq!(decl.name, "Ent".to_string());
 		match decl.ty {
 			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
@@ -99,7 +107,11 @@ mod test {
 		"}";
 		assert!(fuzz::parse_L_API(s.as_str()).is_ok());
 		assert_eq!(fuzz::parse_L_API(s.as_str()).unwrap().len(), 1);
-		let ref decl: api::UDTDecl = fuzz::parse_L_API(s.as_str()).unwrap()[0];
+		let ref decl: api::Declaration = fuzz::parse_L_API(s.as_str()).unwrap()[0];
+		let decl = match decl {
+			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
+			&api::Declaration::UDT(ref udt) => udt,
+		};
 		assert_eq!(decl.name, "Entry".to_string());
 		match decl.ty {
 			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
@@ -159,12 +171,12 @@ mod test {
 	}
 
 	#[test]
-	fn test_fvar_one() {
+	fn test_struct_fvar_single() {
 		let s = "struct X { } var:free blah op:null gen:I32 i32";
 		let decls = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
-		assert_eq!(decls.len(), 1);
+		assert_eq!(decls.len(), 2);
 	}
 }

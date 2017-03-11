@@ -3,11 +3,18 @@ use variable;
 
 grammar;
 
-pub L_API : Vec<api::UDTDecl> = {
+pub L_API : Vec<api::Declaration> = {
 	<decllist: LUDTDecl+> <fvarlist: LFreeVar*> => {
 		// todo fixme: garbage, this should be more than a list of declarations,
 		// code should follow
-		decllist
+		let mut rv: Vec<api::Declaration> = Vec::new();
+		for decl in decllist {
+			rv.push(api::Declaration::UDT(decl));
+		}
+		for fvar in fvarlist {
+			rv.push(api::Declaration::Free(fvar));
+		}
+		rv
 	},
 };
 
@@ -55,22 +62,13 @@ LSimpleType: api::Native = {
 
 LConstant: api::EnumValue = {
 	<nm: LIdentifier> "=" <ival: r"-?[0-9]+"> "," => {
+		// Ideally we would not allow identifier to have digits, as LIdentifier
+		// does, but we cannot due to LALRPOP bug 193.
 		let v = match ival.parse::<i64>() {
 			Err(e) => panic!("error parsing '{}' as an i64."),
 			Ok(x) => x,
 		};
 		(nm, v)
-/* this is our ideal definition of LConstant, but: LALRPOP ambiguity.
-LConstant: api::EnumValue = {
-	<nm: r"[A-Z]+[A-Z0-9]*"> "=" <value: r"-?[0-9]+"> => {
-		let v = match value.parse::<i64>() {
-			Err(e) => panic!("error parsing '{}' as an i64."),
-			Ok(x) => x,
-		};
-		EnumValue(nm.to_string(), v)
-	},
-};
-*/
 	}
 };
 
