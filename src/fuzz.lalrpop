@@ -75,7 +75,6 @@ LConstant: api::EnumValue = {
 LFreeVar: api::FreeVarDecl = {
 	"var" ":" "free" <id: LIdentifier> <oper: LOperation> "gen" ":"
 		<gen: LIdentifier> <ty: LSimpleType> => {
-		println!("var:free {} op:... {} {:?}", id, gen, ty);
 		let fauxtype = api::DeclType::Builtin(api::Native::Void);
 		api::FreeVarDecl{name: id, op: oper, genname: gen, ty: fauxtype}
 	}
