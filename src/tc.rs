@@ -25,7 +25,6 @@
 // utilize randomness.  Thus subsequent runs with the exact same inputs may
 // find different sets of bugs.
 extern crate rand;
-use std::collections::btree_map::BTreeMap;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
 
@@ -159,12 +158,12 @@ impl TC_Enum {
 	// An enum maps strings to their actual values.  But we don't actually care
 	// about the strings, so just pull out all the values and keep those.
 	pub fn new(ty: &Type) -> Self {
-		let enm: BTreeMap<String, u32> = match ty {
-			&Type::Enum(_, ref map) => { map.clone() },
-			x => panic!("Tried to give a non-enum {:?} to TC_Enum!", x),
-		};
-		TC_Enum{
-			values: enm.values().cloned().collect(),
+		match ty {
+			&Type::Enum(_, ref values) => {
+				let val = values.iter().map(|val| val.1.clone() as u32).collect();
+				TC_Enum{values: val}
+			},
+			_ => panic!("gave non-enum type {:?} to Enum::new", ty),
 		}
 	}
 }

@@ -1,3 +1,4 @@
+// Parsing code for externally-defined generators.
 use std::str::FromStr;
 use typ::*;
 use usergen;
@@ -43,12 +44,14 @@ LExpression: usergen::Expression = {
 			let scnst = usergen::Constant::String(lt.to_string());
 			return usergen::Expression::ConstExpr(scnst);
 		}
-		let typ = util::type_from_str(lt.as_str());
+		let typ = match util::type_from_str(lt.as_str()) {
+			Type::Builtin(blt) => blt, _ => panic!("non-Native?"),
+		};
 		let cnsttype: usergen::Constant = match typ {
-			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
+			Native::I8 | Native::I16 | Native::I32 | Native::I64 | Native::Integer =>
 				usergen::Constant::Signed(num),
-			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
-			Type::Unsigned =>
+			Native::U8 | Native::U16 | Native::U32 | Native::U64 | Native::Usize |
+			Native::Unsigned =>
 				usergen::Constant::Unsigned(num as u64),
 			_ => panic!("unhandled type '{:?}'", typ),
 		};
@@ -94,12 +97,14 @@ LTerm: usergen::Expression = {
 		if lt == "string" {
 			panic!("Strings can't be part of compound expressions.");
 		}
-		let typ = util::type_from_str(lt.as_str());
+		let typ = match util::type_from_str(lt.as_str()) {
+			Type::Builtin(nat) => nat, _ => panic!("expected native type"),
+		};
 		let cnsttype: usergen::Constant = match typ {
-			Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::Integer =>
+			Native::I8 | Native::I16 | Native::I32 | Native::I64 | Native::Integer =>
 				usergen::Constant::Signed(num),
-			Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::Usize |
-			Type::Unsigned =>
+			Native::U8 | Native::U16 | Native::U32 | Native::U64 | Native::Usize |
+			Native::Unsigned =>
 				usergen::Constant::Unsigned(num as u64),
 			_ => panic!("unhandled type '{:?}'", typ),
 		};

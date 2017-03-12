@@ -26,32 +26,40 @@ impl UserGen {
 	}
 
 	fn typed_min(t: &Type) -> String {
-		match t {
-			&Type::I8 => i8::min_value().to_string(),
-			&Type::U8 => u8::min_value().to_string(),
-			&Type::I16 => i16::min_value().to_string(),
-			&Type::U16 => u16::min_value().to_string(),
-			&Type::I32 => i32::min_value().to_string(),
-			&Type::U32 => u32::min_value().to_string(),
-			&Type::I64 => i64::min_value().to_string(),
-			&Type::U64 => u64::min_value().to_string(),
-			&Type::Usize => usize::min_value().to_string(),
-			&Type::Integer => i32::min_value().to_string(),
+		let ty = match t {
+			&Type::Builtin(ref blt) => blt.clone(),
+			_ => panic!("need native type for typed_min: {:?}", t),
+		};
+		match ty {
+			Native::I8 => i8::min_value().to_string(),
+			Native::U8 => u8::min_value().to_string(),
+			Native::I16 => i16::min_value().to_string(),
+			Native::U16 => u16::min_value().to_string(),
+			Native::I32 => i32::min_value().to_string(),
+			Native::U32 => u32::min_value().to_string(),
+			Native::I64 => i64::min_value().to_string(),
+			Native::U64 => u64::min_value().to_string(),
+			Native::Usize => usize::min_value().to_string(),
+			Native::Integer => i32::min_value().to_string(),
 			_ => panic!("No minimum for '{:?}'", t),
 		}
 	}
 	fn typed_max(t: &Type) -> String {
-		match t {
-			&Type::I8 => i8::max_value().to_string(),
-			&Type::U8 => u8::max_value().to_string(),
-			&Type::I16 => i16::max_value().to_string(),
-			&Type::U16 => u16::max_value().to_string(),
-			&Type::I32 => i32::max_value().to_string(),
-			&Type::U32 => u32::max_value().to_string(),
-			&Type::I64 => i64::max_value().to_string(),
-			&Type::U64 => u64::max_value().to_string(),
-			&Type::Usize => usize::max_value().to_string(),
-			&Type::Integer => i32::max_value().to_string(),
+		let ty = match t {
+			&Type::Builtin(ref blt) => blt.clone(),
+			_ => panic!("need native type for typed_max: {:?}", t),
+		};
+		match ty {
+			Native::I8 => i8::max_value().to_string(),
+			Native::U8 => u8::max_value().to_string(),
+			Native::I16 => i16::max_value().to_string(),
+			Native::U16 => u16::max_value().to_string(),
+			Native::I32 => i32::max_value().to_string(),
+			Native::U32 => u32::max_value().to_string(),
+			Native::I64 => i64::max_value().to_string(),
+			Native::U64 => u64::max_value().to_string(),
+			Native::Usize => usize::max_value().to_string(),
+			Native::Integer => i32::max_value().to_string(),
 			_ => panic!("No minimum for '{:?}'", t),
 		}
 	}

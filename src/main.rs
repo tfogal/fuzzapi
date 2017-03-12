@@ -1,5 +1,4 @@
 extern crate rand;
-use std::collections::btree_map::BTreeMap;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
@@ -297,9 +296,9 @@ fn builtin_generators() -> Vec<Box<variable::Generator>> {
 	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
 
 	rv.push(Box::new(variable::GenNothing{}));
-	rv.push(Box::new(variable::GenI32::create(&Type::I32)));
-	rv.push(Box::new(variable::GenUsize::create(&Type::Usize)));
-	rv.push(variable::generator(&Type::Integer));
+	rv.push(Box::new(variable::GenI32::create(&Type::Builtin(Native::I32))));
+	rv.push(Box::new(variable::GenUsize::create(&Type::Builtin(Native::Usize))));
+	rv.push(variable::natgenerator(&Native::Integer));
 
 	return rv;
 }
@@ -308,29 +307,28 @@ fn builtin_generators() -> Vec<Box<variable::Generator>> {
 fn hash_generators() -> Vec<Box<variable::Generator>> {
 	let mut rv: Vec<Box<variable::Generator>> = Vec::new();
 
-	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
+	let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
 	rv.push(Box::new(variable::GenOpaque::create(&hs_data_ptr)));
 
-	let char_ptr = Type::Pointer(Box::new(Type::Character));
-	let void_ptr = Type::Pointer(Box::new(Type::Void));
-	let entry = Type::UDT("ENTRY".to_string(),
-		vec![Box::new(Type::Field("key".to_string(), Box::new(char_ptr))),
-		     Box::new(Type::Field("data".to_string(), Box::new(void_ptr)))]
+	let char_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
+	let void_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Void)));
+	let entry = Type::Struct("ENTRY".to_string(),
+		vec![("key".to_string(), Box::new(char_ptr)),
+		     ("data".to_string(), Box::new(void_ptr))]
 	);
 	rv.push(variable::generator(&entry));
 	rv.push(variable::generator(&Type::Pointer(Box::new(entry))));
 
-	let mut action_values: BTreeMap<String, u32> = BTreeMap::new();
-	action_values.insert("FIND".to_string(), 0);
-	action_values.insert("ENTER".to_string(), 1);
+	let action_values = vec![("FIND".to_string(), 0),
+	                         ("ENTER".to_string(), 1)];
 	let action = Type::Enum("ACTION".to_string(), action_values);
 	rv.push(variable::generator(&action));
 	return rv;
 }
 
 fn main() {
-	let hs_data = Type::UDT("struct hsearch_data".to_string(), vec![]);
+	let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
 
 	let mut generators: Vec<Box<variable::Generator>> = {
@@ -353,15 +351,13 @@ fn main() {
 	generators.append(&mut hash_generators());
 	let generators: Vec<Box<variable::Generator>> = generators; // drop mut.
 
-	let char_ptr = Type::Pointer(Box::new(Type::Character));
-	let void_ptr = Type::Pointer(Box::new(Type::Void));
-	let entry = Type::UDT("ENTRY".to_string(),
-		vec![Box::new(Type::Field("key".to_string(), Box::new(char_ptr))),
-		     Box::new(Type::Field("data".to_string(), Box::new(void_ptr)))]
+	let char_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
+	let void_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Void)));
+	let entry = Type::Struct("ENTRY".to_string(),
+		vec![("key".to_string(), Box::new(char_ptr)),
+		     ("data".to_string(), Box::new(void_ptr))]
 	);
-	let mut action_values: BTreeMap<String, u32> = BTreeMap::new();
-	action_values.insert("FIND".to_string(), 0);
-	action_values.insert("ENTER".to_string(), 1);
+	let action_values = vec![("FIND".to_string(), 0), ("ENTER".to_string(), 1)];
 	let action = Type::Enum("ACTION".to_string(), action_values);
 
 	use variable::ScalarOp;
@@ -370,13 +366,13 @@ fn main() {
 	let genname = "std:opaque:struct hsearch_data*";
 	let hsd_var = variable::Source::free_gen("tbl", genname,
 	                                         &generators, ScalarOp::AddressOf);
-	let fa1 = Argument::new(&Type::Usize, nel);
+	let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
 	let fa2 = Argument::new(&hs_data, hsd_var.clone());
 	let hcreate_args = vec![fa1, fa2];
 
 	let hc_retval = variable::Source::retval("crterr", "hcreate_r",
 	                                         ScalarOp::Null);
-	let hcr_rt = ReturnType::new(&Type::Integer, hc_retval);
+	let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
 	let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
@@ -395,7 +391,9 @@ fn main() {
 	];
 	let hs_rv = variable::Source::retval("hserr", "hsearch_r", ScalarOp::Null);
 	let mut hsearch = Function::new("hsearch_r",
-		&ReturnType::new(&Type::Integer,	hs_rv), &hsearch_r_args);
+		&ReturnType::new(&Type::Builtin(Native::Integer),	hs_rv),
+		&hsearch_r_args
+	);
 
 	let mut functions: Vec<&mut Function> = vec![&mut hcreate, &mut hsearch];
 	let immut = unsafe {

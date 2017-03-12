@@ -1,19 +1,16 @@
+// This provides a type system and API for parsing code.
+//
+// The type system here mirrors typ::Type, but we use more strings here
+// to reference types instead of fully instantiating them.  This makes
+// sense for parsing, because it lets us parse without worrying too
+// much about semantics, and thereby importantly means we do less error
+// handling during parsing and more during subsequent semantic analysis.
+use typ::{EnumValue, Type};
 use variable;
-
-#[derive(Debug, PartialEq)]
-pub enum Native {
-	U8, U16, U32, U64, Usize,
-	I8, I16, I32, I64, Integer,
-	Character,
-	Void,
-	Pointer(Box<Native>),
-}
-
-pub type EnumValue = (String, i64);
 
 #[derive(Debug)]
 pub enum DeclType {
-	Builtin(Native),
+	Basic(Type),
 	Struct(Vec<UDTDecl>),
 	Enum(Vec<EnumValue>),
 	StructRef(String),
@@ -40,8 +37,9 @@ pub enum Declaration {
 
 #[cfg(test)]
 mod test {
-	use fuzz;
 	use api;
+	use fuzz;
+	use typ;
 
 	#[test]
 	fn test_empty_struct() {
@@ -55,7 +53,7 @@ mod test {
 		};
 		assert_eq!(decl.name, "entry".to_string());
 		match decl.ty {
-			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
+			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
 			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
 			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
 			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
@@ -77,7 +75,7 @@ mod test {
 		};
 		assert_eq!(decl.name, "Ent".to_string());
 		match decl.ty {
-			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
+			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
 			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
 			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
 			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
@@ -90,9 +88,9 @@ mod test {
 					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::Builtin(ref blt) => {
-						let ch = api::Native::Character;
-						assert_eq!(blt, &api::Native::Pointer(Box::new(ch)));
+					api::DeclType::Basic(ref blt) => {
+						let ch = typ::Type::Builtin(typ::Native::Character);
+						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
 					}
 				}
 			},
@@ -114,7 +112,7 @@ mod test {
 		};
 		assert_eq!(decl.name, "Entry".to_string());
 		match decl.ty {
-			api::DeclType::Builtin(_) => panic!("type should be UDT, is Builtin"),
+			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
 			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
 			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
 			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
@@ -127,9 +125,9 @@ mod test {
 					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::Builtin(ref blt) => {
-						let ch = api::Native::Character;
-						assert_eq!(blt, &api::Native::Pointer(Box::new(ch)));
+					api::DeclType::Basic(ref blt) => {
+						let ch = typ::Type::Builtin(typ::Native::Character);
+						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
 					}
 				}
 				let ref value: api::UDTDecl = decllist[1];
@@ -139,9 +137,9 @@ mod test {
 					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::Builtin(ref blt) => {
-						let ch = api::Native::Void;
-						assert_eq!(blt, &api::Native::Pointer(Box::new(ch)));
+					api::DeclType::Basic(ref blt) => {
+						let ch = typ::Type::Builtin(typ::Native::Void);
+						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
 					}
 				}
 			},

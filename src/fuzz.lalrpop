@@ -1,4 +1,6 @@
+// Parsing grammar/code for the user's program abstraction.
 use api;
+use typ::{Native, Type};
 use variable;
 
 grammar;
@@ -6,7 +8,7 @@ grammar;
 pub L_API : Vec<api::Declaration> = {
 	<decllist: LUDTDecl+> <fvarlist: LFreeVar*> => {
 		// todo fixme: garbage, this should be more than a list of declarations,
-		// code should follow
+		// abstract code should follow
 		let mut rv: Vec<api::Declaration> = Vec::new();
 		for decl in decllist {
 			rv.push(api::Declaration::UDT(decl));
@@ -34,11 +36,12 @@ LIdentifier: String = {
 
 LField: api::UDTDecl = {
 	"pointer" <blt: LSimpleType> <name: LIdentifier> ";" => {
-		let ptr = api::Native::Pointer(Box::new(blt));
-		api::UDTDecl{name: name, ty: api::DeclType::Builtin(ptr)}
+		let ptr = Type::Pointer(Box::new(Type::Builtin(blt)));
+		api::UDTDecl{name: name, ty: api::DeclType::Basic(ptr)}
 	},
 	<blt: LSimpleType> <name: LIdentifier> ";" => {
-		api::UDTDecl{name: name, ty: api::DeclType::Builtin(blt)}
+		api::UDTDecl{name: name,
+		             ty: api::DeclType::Basic(Type::Builtin(blt))}
 	},
 	"struct" <ty: LIdentifier> <name: LIdentifier> ";" => {
 		let udt = api::DeclType::StructRef(name);
@@ -49,18 +52,18 @@ LField: api::UDTDecl = {
 	}
 };
 
-LSimpleType: api::Native = {
-	"u8" => api::Native::U8, "u16" => api::Native::U16,
-	"u32" => api::Native::U32, "u64" => api::Native::U64,
-	"usize" => api::Native::Usize,
-	"i8" => api::Native::I8, "i16" => api::Native::I16,
-	"i32" => api::Native::I32, "i64" => api::Native::I64,
-	"int" => api::Native::Integer,
-	"void" => api::Native::Void,
-	"char" => api::Native::Character,
+LSimpleType: Native = {
+	"u8" => Native::U8, "u16" => Native::U16,
+	"u32" => Native::U32, "u64" => Native::U64,
+	"usize" => Native::Usize,
+	"i8" => Native::I8, "i16" => Native::I16,
+	"i32" => Native::I32, "i64" => Native::I64,
+	"int" => Native::Integer,
+	"void" => Native::Void,
+	"char" => Native::Character,
 };
 
-LConstant: api::EnumValue = {
+LConstant: ::typ::EnumValue = {
 	<nm: LIdentifier> "=" <ival: r"-?[0-9]+"> "," => {
 		// Ideally we would not allow identifier to have digits, as LIdentifier
 		// does, but we cannot due to LALRPOP bug 193.
@@ -75,8 +78,9 @@ LConstant: api::EnumValue = {
 LFreeVar: api::FreeVarDecl = {
 	"var" ":" "free" <id: LIdentifier> <oper: LOperation> "gen" ":"
 		<gen: LIdentifier> <ty: LSimpleType> => {
-		let fauxtype = api::DeclType::Builtin(api::Native::Void);
-		api::FreeVarDecl{name: id, op: oper, genname: gen, ty: fauxtype}
+		let fauxtype = Type::Builtin(Native::Void);
+		api::FreeVarDecl{name: id, op: oper, genname: gen,
+		                 ty: api::DeclType::Basic(fauxtype)}
 	}
 };
 

@@ -1,4 +1,4 @@
-// This holds information about a variable is used in an API.  Breifly:
+// This holds information about a variable is used in an API.  Briefly:
 //   Source: where the variable comes from / how it is generated
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
@@ -142,34 +142,42 @@ impl fmt::Debug for Box<Generator> {
 	}
 }
 
+pub fn natgenerator(t: &Native) -> Box<Generator> {
+	match t {
+		&Native::I32 => Box::new(GenI32::create(&Type::Builtin(t.clone()))),
+		&Native::Usize => Box::new(GenUsize::create(&Type::Builtin(t.clone()))),
+		&Native::Integer => {
+			println!("WARNING: using I32 generator for integer!");
+			Box::new(GenI32::create(&Type::Builtin(t.clone())))
+		}
+		_ => panic!("unimplemented native type {:?}", t),
+	}
+}
 // There are special cases if you want to constrain the generator in some way.
 // But if any value of that type will be fine, then you can just use this
 // 'generator' method to get the most generic Generator for the given type.
 pub fn generator(t: &Type) -> Box<Generator> {
 	match t {
+		&Type::Builtin(ref n) => natgenerator(n),
 		&Type::Enum(_, _) => Box::new(GenEnum::create(t)),
-		&Type::I32 => Box::new(GenI32::create(t)),
 		// Pointers to characters are interpreted to mean CStrings.
 		&Type::Pointer(ref ty)
-			if match **ty { Type::Character => true, _ => false } => {
-				Box::new(GenCString::create(t))
-			},
+			if match **ty { // guard on type being a builtin ...
+				Type::Builtin(ref n) if match n { // ... and that builtin being char
+					&Native::Character => true, _ => false,
+				} => true, _ => false,
+			} => Box::new(GenCString::create(t)),
 		// Pointers to anything else are just generic pointers...
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
-		&Type::Field(_, ref x) => generator(x),
-		&Type::Usize => Box::new(GenUsize::create(t)),
-		&Type::UDT(_, ref flds) => {
+		// todo fixme how are fields handled now...?
+		//&Type::Field(_, ref x) => generator(x),
+		&Type::Struct(_, ref flds) => {
 			if flds.len() == 0 {
 				Box::new(GenOpaque::create(t))
 			} else {
-				Box::new(GenUDT::create(t))
+				Box::new(GenStruct::create(t))
 			}
 		},
-		&Type::Integer => {
-			println!("WARNING: using I32 generator for integer!");
-			Box::new(GenI32::create(t))
-		}
-		_ => panic!("unimplemented type {:?}", t), // for no valid reason
 	}
 }
 
@@ -364,19 +372,20 @@ impl Generator for GenUsize {
 }
 
 #[derive(Debug)]
-pub struct GenUDT {
-	types: Vec<Type>,
+pub struct GenStruct {
+	fields: Vec<Field>,
 	values: Vec<Box<Generator>>,
 	idx: Vec<usize>,
 }
 
-impl GenUDT {
+impl GenStruct {
 	pub fn create(t: &Type) -> Self {
-		// UDT's 2nd tuple param is a Vec<Box<Type>>, but we want a Vec<Type>.
+		// Struct's 2nd tuple param is a Vec<(String, Box<Type>)>, but we want a
+		// Vec<Type>.
 		let tys: Vec<Type> = match t {
-			&Type::UDT(_, ref types) =>
-				types.iter().map(|x| (**x).clone()).collect(),
-			_ => panic!("{:?} type given to GenUDT!", t),
+			&Type::Struct(_, ref flds) =>
+				flds.iter().map(|x| (*(*x).1).clone()).collect(),
+			_ => panic!("{:?} type given to GenStruct!", t),
 		};
 		// create an appropriate value for every possible type.
 		let mut val: Vec<Box<Generator>> = Vec::new();
@@ -386,10 +395,14 @@ impl GenUDT {
 		}
 		let nval: usize = val.len();
 		assert_eq!(tys.len(), val.len());
-		GenUDT{
-			types: tys,
+		let fld = match t {
+			&Type::Struct(_, ref flds) => flds.clone(),
+			_ => panic!("invalid struct type"),
+		};
+		GenStruct{
+			fields: fld,
 			values: val,
-			// we need a vector of 0s the same size as 'values' or 'types'
+			// we need a vector of 0s the same size as 'values' or 'fields'
 			idx: (0..nval).map(|_| 0).collect(),
 		}
 	}
@@ -403,8 +416,8 @@ impl GenUDT {
 	}
 }
 
-impl Generator for GenUDT {
-	fn name(&self) -> String { "std:UDT".to_string() }
+impl Generator for GenStruct {
+	fn name(&self) -> String { "std:Struct".to_string() }
 	fn value(&mut self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
@@ -412,10 +425,7 @@ impl Generator for GenUDT {
 		write!(&mut rv, "{{\n").unwrap();
 
 		for i in 0..self.values.len() {
-			let nm = match self.types[i] {
-				Type::Field(ref name, _) => name,
-				ref x => panic!("GenUDT types are {:?}, not fields?", x),
-			};
+			let ref nm: String = self.fields[i].0;
 			write!(&mut rv, "\t\t.{} = {},\n", nm, self.values[i].value()).unwrap();
 		}
 
@@ -465,8 +475,8 @@ impl Generator for GenUDT {
 		write!(f, "}}")
 	}
 	fn clone(&self) -> Box<Generator> {
-		Box::new(GenUDT{types: self.types.clone(),
-		                values: self.clone_values(), idx: self.idx.clone()})
+		Box::new(GenStruct{fields: self.fields.clone(),
+		                   values: self.clone_values(), idx: self.idx.clone()})
 	}
 }
 
@@ -539,7 +549,7 @@ impl ::std::fmt::Debug for GenCString {
 
 impl GenCString {
 	pub fn create(t: &Type) -> Self {
-		let x = Type::Pointer(Box::new(Type::Character));
+		let x = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
 		assert!(*t == x);
 		GenCString{idx: 0, printable: TC_Char_Printable::new(),
 		           control: TC_Char_Special::new() }

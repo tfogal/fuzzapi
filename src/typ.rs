@@ -1,18 +1,23 @@
-use std::collections::btree_map::BTreeMap;
+// A Native type is a type that is builtin to the language.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Native {
+	U8, U16, U32, U64, Unsigned, Usize,
+	I8, I16, I32, I64, Integer,
+	F32, F64,
+	Character,
+	Void,
+}
+
+pub type EnumValue = (String, i64);
+pub type Field = (String, Box<Type>);
 
 // A Type holds the basic immutable type information of the object.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(dead_code)]
 pub enum Type {
-	U8, I8, U16, I16, U32, I32, U64, I64, F32, F64,
-	Usize, Integer, Unsigned,
-	Character,
-	Void,
-	Enum(String, BTreeMap<String, u32>), // name + set of values
-	// Each Type in the vec is assumed to be a Field.
-	UDT(String, Vec<Box<Type>>),
-	Field(String, Box<Type>),
+	Builtin(Native),
 	Pointer(Box<Type>),
+	Struct(String, Vec<Field>),
+	Enum(String, Vec<EnumValue>),
 }
 
 pub trait Name {
@@ -23,34 +28,35 @@ macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
 
-impl Name for Type {
-	fn name<'a>(&'a self) -> String {
-		use std::fmt::Write;
-		use typ::Type::*;
-		let mut res = String::new();
+impl Name for Native {
+	fn name(&self) -> String {
 		match self {
-			&U8 => "uint8_t",
-			&I8 => "int8_t",
-			&U16 => "uint16_t", &I16 => "int16_t",
-			&U32 => "uint32_t", &I32 => "int32_t",
-			&U64 => "uint64_t", &I64 => "int64_t",
-			&F32 => "float", &F64 => "double",
-			&Usize => "size_t", &Integer => "int", &Unsigned => "unsigned",
-			&Character => "char",
-			&Void => "void",
-			&Enum(ref enm, _) => {
-				tryp!(write!(&mut res, "{}", enm));
-				res.as_str().clone()
-			},
-			&Type::UDT(ref udt, _) => udt,
-			&Type::Field(_, ref ty) => {
-				tryp!(write!(&mut res, "{}", ty.name()));
-				res.as_str().clone()
-			},
-			&Type::Pointer(ref t) => {
-				tryp!(write!(&mut res, "{}*", t.name()));
-				res.as_str().clone()
-			},
+			&Native::U8 => "uint8_t",
+			&Native::I8 => "int8_t",
+			&Native::U16 => "uint16_t", &Native::I16 => "int16_t",
+			&Native::U32 => "uint32_t", &Native::I32 => "int32_t",
+			&Native::U64 => "uint64_t", &Native::I64 => "int64_t",
+			&Native::F32 => "float", &Native::F64 => "double",
+			&Native::Usize => "size_t", &Native::Integer => "int",
+			&Native::Unsigned => "unsigned",
+			&Native::Character => "char",
+			&Native::Void => "void",
 		}.to_string()
+	}
+}
+
+impl Name for Type {
+	fn name(&self) -> String {
+		use std::fmt::Write;
+		match self {
+			&Type::Builtin(ref blt) => blt.name(),
+			&Type::Pointer(ref t) => {
+				let mut res = String::new();
+				tryp!(write!(&mut res, "{}*", t.name()));
+				res
+			},
+			&Type::Struct(ref udt, _) => udt.clone(),
+			&Type::Enum(ref enm, _) => enm.clone(),
+		}
 	}
 }
