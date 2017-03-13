@@ -34,7 +34,7 @@ impl Source {
 	// Construct a free variable that uses the generator named 'gen' obtained via
 	// lookup in 'list'.
 	pub fn free_gen(nm: &str, gen: &str, list: &Vec<Box<Generator>>,
-	                     o: ScalarOp) -> Rc<RefCell<Source>> {
+	                o: ScalarOp) -> Rc<RefCell<Source>> {
 		let g: Box<Generator> = match generator_list(gen, &list) {
 			None => panic!("No generator named '{}'.  Known generators: {:?}", gen,
 			               gennames(&list)),
@@ -53,7 +53,8 @@ impl Source {
 		return self.name.len() != 0 && self.fqn.len() == 0;
 	}
 
-	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) -> Rc<RefCell<Source>> {
+	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) ->
+		Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
 			parent: vec![parent],
