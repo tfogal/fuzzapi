@@ -42,7 +42,8 @@ fn rvalue(src: &variable::Source) -> String {
 	} else if src.is_bound() {
 		/* should we prepend scalar op? */
 		use std::ops::Deref;
-		return rvalue(src.parent[0].borrow().deref());
+		let dad = src.parent.clone().unwrap(); // appease borrow checker.
+		return rvalue(dad.borrow().deref());
 	} else if src.is_retval() {
 		tryp!(write!(rv, "/*fixme, from ret*/"));
 	}

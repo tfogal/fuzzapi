@@ -18,7 +18,7 @@ pub struct Source {
 	// There is only ever one parent and/or function.  However we need to store
 	// them in vectors because Rust is annoying and doesn't let us create an
 	// "empty" RefCell.
-	pub parent: Vec<Rc<RefCell<Source>>>,
+	pub parent: Option<Rc<RefCell<Source>>>,
 	fqn: String,
 }
 impl Source {
@@ -26,7 +26,7 @@ impl Source {
 	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: generator(ty), op: o,
-			parent: Vec::new(),
+			parent: None,
 			fqn: "".to_string(),
 		}))
 	}
@@ -42,7 +42,7 @@ impl Source {
 		};
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: g, op: o,
-			parent: Vec::new(),
+			parent: None,
 			fqn: "".to_string(),
 		}))
 	}
@@ -57,18 +57,18 @@ impl Source {
 		Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
-			parent: vec![parent],
+			parent: Some(parent),
 			fqn: "".to_string(),
 		}))
 	}
 	pub fn is_bound(&self) -> bool {
-		return self.parent.len() == 1;
+		return self.parent.is_some();
 	}
 
 	pub fn retval(name: &str, fqn: &str, oper: ScalarOp) -> Rc<RefCell<Source>> {
 		Rc::new(RefCell::new(Source{
 			name: name.to_string(), generator: Box::new(GenNothing{}), op: oper,
-			parent: Vec::new(),
+			parent: None,
 			fqn: fqn.to_string(),
 		}))
 	}
@@ -80,7 +80,10 @@ impl Source {
 impl Name for Source {
 	fn name(&self) -> String {
 		if self.is_free() { return self.name.clone(); }
-		if self.is_bound() { return self.parent[0].borrow().name(); }
+		if self.is_bound() {
+			let par = self.parent.clone().unwrap(); // appease borrow checker.
+			return par.borrow().name();
+		}
 		if self.is_retval() { return self.fqn.clone(); }
 		println!("invalid source: {:?}", self);
 		unreachable!();
