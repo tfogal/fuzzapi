@@ -30,6 +30,20 @@ pub struct FreeVarDecl {
 	pub ty: DeclType, // Struct(...) and Enum(...) are not valid, but *Refs are.
 }
 
+#[derive(Debug)]
+pub struct Func {
+	pub name: String,
+	pub retval: DeclType,
+	pub arguments: Vec<DeclType>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FuncCall {
+	pub name: String,
+	pub retval: String, // the type name encoded as a string
+	pub arguments: Vec<String>, // arguments encoded as a string.
+}
+
 pub enum Declaration {
 	Free(FreeVarDecl),
 	UDT(UDTDecl),
@@ -176,5 +190,14 @@ mod test {
 			Err(e) => panic!("{:?}", e),
 		};
 		assert_eq!(decls.len(), 2);
+	}
+
+	#[test]
+	fn test_parse_function_new() {
+		let s = "function:new hcreate_r int {usize, pointer struct hsearch_data,}";
+		let _ = match fuzz::parse_L_API(s) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
 	}
 }

@@ -6,7 +6,7 @@ use variable;
 grammar;
 
 pub L_API : Vec<api::Declaration> = {
-	<decllist: LUDTDecl+> <fvarlist: LFreeVar*> => {
+	<decllist: LUDTDecl*> <fvarlist: LFreeVar*> <funclist: LFunc*> => {
 		// todo fixme: garbage, this should be more than a list of declarations,
 		// abstract code should follow
 		let mut rv: Vec<api::Declaration> = Vec::new();
@@ -90,4 +90,28 @@ LOperation: variable::ScalarOp = {
 	"op:deref" => variable::ScalarOp::Deref,
 	"op:&" => variable::ScalarOp::AddressOf,
 	"op:addressof" => variable::ScalarOp::AddressOf,
+};
+
+LFunc: () = {
+	"function:new" <nm: LIdentifier> <rtype: LSimpleType> "{" <arg: LArgTy*> "}"
+		=> {
+		// todo / fixme: return an actual type that we can use.
+/*
+		use typ::Name;
+		println!("{} {}({:?})", rtype.name(), nm, arg);
+*/
+	},
+};
+
+LArgTy: String = {
+	<tyname: LTypeRef> "," => {
+		tyname
+	},
+};
+
+LTypeRef: String = {
+	<builtin: LSimpleType> => { use typ::Name; builtin.name() },
+	"struct" <sref: LIdentifier> => "struct ".to_string() + sref.as_str(),
+	"enum" <eref: LIdentifier> => "enum ".to_string() + eref.as_str(),
+	"pointer" <subtype: LTypeRef> => "pointer ".to_string() + subtype.as_str(),
 };
