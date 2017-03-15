@@ -31,7 +31,7 @@ LUDTDecl: api::UDTDecl = {
 };
 
 LIdentifier: String = {
-	<nm: r"[[:alpha:]]+[[:alnum:]]*"> => nm.to_string(),
+	<nm: r"[[:alpha:]]+([[:alnum:]]|_)*"> => nm.to_string(),
 };
 
 LField: api::UDTDecl = {
