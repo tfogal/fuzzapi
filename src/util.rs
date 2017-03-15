@@ -12,7 +12,7 @@ pub fn type_from_str(typename: &str) -> Type {
 		"U64" | "u64" => Native::U64,
 		"float" | "f32" => Native::F32,
 		"double" | "f64" => Native::F64,
-		"Usize" => Native::Usize,
+		"Usize" | "size_t" => Native::Usize,
 		"Integer" => Native::Integer,
 		"Unsigned" => Native::Unsigned,
 		"Character" => Native::Character,
