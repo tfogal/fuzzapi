@@ -209,4 +209,24 @@ mod test {
 		};
 		assert_eq!(fqn.name, "hcreate_r");
 	}
+
+	#[test]
+	fn test_parse_two_function_decls() {
+		let s = "function:new hcreate_r int {".to_string() +
+			"usize, pointer struct hsearch_data," +
+		"}" +
+		"function:new hsearch_r int {" +
+			"int, int, pointer pointer int, pointer struct hsearch_data," +
+		"}";
+		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		assert_eq!(decls.len(), 2);
+		let fqn = match decls[0] {
+			api::Declaration::Function(ref f) => f,
+			_ => panic!("non function type {:?}", decls[0]),
+		};
+		assert_eq!(fqn.name, "hcreate_r");
+	}
 }
