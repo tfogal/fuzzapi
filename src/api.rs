@@ -23,6 +23,7 @@ pub struct UDTDecl {
 	pub ty: DeclType,
 }
 
+#[derive(Debug)]
 pub struct FreeVarDecl {
 	pub name: String,
 	pub op: variable::ScalarOp,
@@ -31,7 +32,7 @@ pub struct FreeVarDecl {
 }
 
 #[derive(Debug)]
-pub struct Func {
+pub struct FuncDecl {
 	pub name: String,
 	pub retval: DeclType,
 	pub arguments: Vec<DeclType>,
@@ -44,8 +45,10 @@ pub struct FuncCall {
 	pub arguments: Vec<String>, // arguments encoded as a string.
 }
 
+#[derive(Debug)]
 pub enum Declaration {
 	Free(FreeVarDecl),
+	Function(FuncDecl),
 	UDT(UDTDecl),
 }
 
@@ -62,8 +65,8 @@ mod test {
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
 		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
 		let decl = match decl {
-			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
 			&api::Declaration::UDT(ref udt) => udt,
+			_ => panic!("invalid declaration parse {:?}", decl),
 		};
 		assert_eq!(decl.name, "entry".to_string());
 		match decl.ty {
@@ -84,8 +87,8 @@ mod test {
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
 		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
 		let decl = match decl {
-			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
 			&api::Declaration::UDT(ref udt) => udt,
+			_ => panic!("invalid declaration parse {:?}", decl),
 		};
 		assert_eq!(decl.name, "Ent".to_string());
 		match decl.ty {
@@ -121,8 +124,8 @@ mod test {
 		assert_eq!(fuzz::parse_L_API(s.as_str()).unwrap().len(), 1);
 		let ref decl: api::Declaration = fuzz::parse_L_API(s.as_str()).unwrap()[0];
 		let decl = match decl {
-			&api::Declaration::Free(_) => panic!("invalid declaration parse"),
 			&api::Declaration::UDT(ref udt) => udt,
+			_ => panic!("invalid declaration parse {:?}", decl),
 		};
 		assert_eq!(decl.name, "Entry".to_string());
 		match decl.ty {
@@ -195,9 +198,15 @@ mod test {
 	#[test]
 	fn test_parse_function_new() {
 		let s = "function:new hcreate_r int {usize, pointer struct hsearch_data,}";
-		let _ = match fuzz::parse_L_API(s) {
+		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
+		assert_eq!(decls.len(), 1);
+		let fqn = match decls[0] {
+			api::Declaration::Function(ref f) => f,
+			_ => panic!("non function type {:?}", decls[0]),
+		};
+		assert_eq!(fqn.name, "hcreate_r");
 	}
 }

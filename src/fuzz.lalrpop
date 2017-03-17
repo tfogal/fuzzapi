@@ -16,6 +16,9 @@ pub L_API : Vec<api::Declaration> = {
 		for fvar in fvarlist {
 			rv.push(api::Declaration::Free(fvar));
 		}
+		for fqn in funclist {
+			rv.push(api::Declaration::Function(fqn));
+		}
 		rv
 	},
 };
@@ -92,26 +95,38 @@ LOperation: variable::ScalarOp = {
 	"op:addressof" => variable::ScalarOp::AddressOf,
 };
 
-LFunc: () = {
-	"function:new" <nm: LIdentifier> <rtype: LSimpleType> "{" <arg: LArgTy*> "}"
+LFunc: api::FuncDecl = {
+	"function:new" <nm: LIdentifier> <rtype: LTypeRef> "{" <arg: LArgTy*> "}"
 		=> {
-		// todo / fixme: return an actual type that we can use.
 /*
-		use typ::Name;
-		println!("{} {}({:?})", rtype.name(), nm, arg);
+		let rv = api::DeclType::Basic(Type::Builtin(rtype));
+		api::Func{name: nm, retval: rv, arguments: arg}
 */
+		api::FuncDecl{name: nm, retval: rtype, arguments: arg}
 	},
 };
 
-LArgTy: String = {
+LArgTy: api::DeclType = {
 	<tyname: LTypeRef> "," => {
 		tyname
 	},
 };
 
-LTypeRef: String = {
-	<builtin: LSimpleType> => { use typ::Name; builtin.name() },
-	"struct" <sref: LIdentifier> => "struct ".to_string() + sref.as_str(),
-	"enum" <eref: LIdentifier> => "enum ".to_string() + eref.as_str(),
-	"pointer" <subtype: LTypeRef> => "pointer ".to_string() + subtype.as_str(),
+LTypeRef: api::DeclType = {
+	<builtin: LSimpleType> => {
+		let ty = Type::Builtin(builtin);
+		api::DeclType::Basic(ty)
+	},
+	"struct" <sref: LIdentifier> => api::DeclType::StructRef(sref),
+	"enum" <eref: LIdentifier> => api::DeclType::EnumRef(eref),
+	"pointer" <subtype: LTypeRef> => {
+		let sty = match subtype {
+			api::DeclType::Basic(ty) => ty,
+			api::DeclType::StructRef(nm) => Type::Struct(nm, vec![]), // fake struct.
+			api::DeclType::EnumRef(nm) => Type::Enum(nm, vec![]), // fake enum.
+			_ => panic!("invalid LTypeRef {:?}", subtype),
+		};
+		let ty = Type::Pointer(Box::new(sty));
+		api::DeclType::Basic(ty)
+	},
 };
