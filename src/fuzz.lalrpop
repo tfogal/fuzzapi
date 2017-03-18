@@ -7,7 +7,7 @@ grammar;
 
 pub L_API : Vec<api::Declaration> = {
 	<decllist: LUDTDecl*> <fvarlist: LFreeVar*> <funclist: LFunc*> => {
-		// todo fixme: garbage, this should be more than a list of declarations,
+		// todo fixme: this should be more than a list of declarations,
 		// abstract code should follow
 		let mut rv: Vec<api::Declaration> = Vec::new();
 		for decl in decllist {
@@ -98,10 +98,6 @@ LOperation: variable::ScalarOp = {
 LFunc: api::FuncDecl = {
 	"function:new" <nm: LIdentifier> <rtype: LTypeRef> "{" <arg: LArgTy*> "}"
 		=> {
-/*
-		let rv = api::DeclType::Basic(Type::Builtin(rtype));
-		api::Func{name: nm, retval: rv, arguments: arg}
-*/
 		api::FuncDecl{name: nm, retval: rtype, arguments: arg}
 	},
 };

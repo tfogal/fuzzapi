@@ -56,7 +56,7 @@ pub enum Declaration {
 mod test {
 	use api;
 	use fuzz;
-	use typ;
+	use typ::{Native, Type};
 
 	#[test]
 	fn test_empty_struct() {
@@ -106,8 +106,8 @@ mod test {
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::Basic(ref blt) => {
-						let ch = typ::Type::Builtin(typ::Native::Character);
-						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
+						let ch = Type::Builtin(Native::Character);
+						assert_eq!(blt, &Type::Pointer(Box::new(ch)));
 					}
 				}
 			},
@@ -143,8 +143,8 @@ mod test {
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::Basic(ref blt) => {
-						let ch = typ::Type::Builtin(typ::Native::Character);
-						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
+						let ch = Type::Builtin(Native::Character);
+						assert_eq!(blt, &Type::Pointer(Box::new(ch)));
 					}
 				}
 				let ref value: api::UDTDecl = decllist[1];
@@ -155,8 +155,8 @@ mod test {
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::Basic(ref blt) => {
-						let ch = typ::Type::Builtin(typ::Native::Void);
-						assert_eq!(blt, &typ::Type::Pointer(Box::new(ch)));
+						let ch = Type::Builtin(Native::Void);
+						assert_eq!(blt, &Type::Pointer(Box::new(ch)));
 					}
 				}
 			},
@@ -208,6 +208,34 @@ mod test {
 			_ => panic!("non function type {:?}", decls[0]),
 		};
 		assert_eq!(fqn.name, "hcreate_r");
+		match fqn.retval {
+			api::DeclType::Basic(ref ty) => match ty {
+				&Type::Builtin(ref t) => assert_eq!(*t, Native::Integer),
+				_ => panic!("basic type, but {:?}, not integer", ty),
+			},
+			_ => panic!("retval should be a basic type, not {:?}", fqn.retval),
+		};
+		assert_eq!(fqn.arguments.len(), 2);
+		match fqn.arguments[0] {
+			api::DeclType::Basic(ref ty) => match ty {
+				&Type::Builtin(ref t) => assert_eq!(*t, Native::Usize),
+				_ => panic!("basic type, but {:?} not usize", ty),
+			},
+			_ => panic!("arg0 should be a basic type, not {:?}", fqn.arguments[0]),
+		};
+		let ptr: &Type = match fqn.arguments[1] {
+			api::DeclType::Basic(ref ptr) => ptr,
+			_ => panic!("invalid arg1: {:?}", fqn.arguments[1]),
+		};
+		let boxptr = match ptr {
+			&Type::Pointer(ref b) => b,
+			_ => panic!("invalid ptr type {:?}", ptr),
+		};
+		use std::ops::Deref;
+		match boxptr.deref() {
+			&Type::Struct(ref nm, _) => assert_eq!(nm, "hsearch_data"),
+			_ => panic!("invalid box ptr {:?}", boxptr),
+		};
 	}
 
 	#[test]
