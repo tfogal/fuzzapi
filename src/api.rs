@@ -5,7 +5,7 @@
 // sense for parsing, because it lets us parse without worrying too
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
-use typ::{EnumValue, Type};
+use typ::{Decl, EnumValue, Type};
 use variable;
 
 #[derive(Debug)]
@@ -50,6 +50,59 @@ pub enum Declaration {
 	Free(FreeVarDecl),
 	Function(FuncDecl),
 	UDT(UDTDecl),
+}
+
+// gives the type from the declaration.
+// it needs to take the current type list as well, because this DeclType may
+// reference other types, and it would need to produce boxes to those types.
+fn type_from_decl(decl: &DeclType) -> Type {
+	match decl {
+		&DeclType::Basic(ref ty) => ty.clone(),
+		&DeclType::Struct(ref udt) => {
+			let mut flds: Vec<(String, Box<Type>)> = Vec::new();
+			for f in udt {
+				match f.ty {
+					DeclType::Basic(ref ty) =>
+						flds.push(("_unnamed_".to_string(), Box::new(ty.clone()))),
+					DeclType::Struct(ref st) => {
+						for s in st {
+							let subtype = type_from_decl(&s.ty);
+							flds.push(("_unnamed2_".to_string(), Box::new(subtype)));
+						}
+					},
+					DeclType::Enum(ref en) => {
+						let v = Type::Enum("_unnamed_enum_".to_string(), en.clone());
+						flds.push(("_unnamed3_".to_string(), Box::new(v)));
+					}
+					DeclType::StructRef(/*ref nm*/ _) => unimplemented!(),
+					DeclType::EnumRef(/*ref nm*/ _) => unimplemented!(),
+				}
+			}
+			Type::Struct("_unnamed_struct_".to_string(), flds)
+		},
+		&DeclType::Enum(_) => unimplemented!(),
+		&DeclType::StructRef(_) => unimplemented!(),
+		&DeclType::EnumRef(_) => unimplemented!(),
+	}
+}
+
+// replaces the "Decl" types from this module with the typ::* counterparts,
+// potentially panic'ing due to invalid semantics.
+fn resolve_types(decls: &Vec<Declaration>) ->
+	(Vec<Decl>, Vec<variable::Source>) {
+	assert!(decls.len() > 0);
+	let mut drv: Vec<Decl> = Vec::new();
+
+	for decl in decls {
+		match decl {
+			&Declaration::Free(ref fvar) => {
+				drv.push(Decl::Ty(type_from_decl(&fvar.ty)));
+			},
+			&Declaration::Function(ref fqn) => {},
+			&Declaration::UDT(ref udecl) => {},
+		};
+	}
+	(drv, vec![])
 }
 
 #[cfg(test)]

@@ -1,3 +1,5 @@
+use function;
+
 // A Native type is a type that is builtin to the language.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Native {
@@ -18,6 +20,11 @@ pub enum Type {
 	Pointer(Box<Type>),
 	Struct(String, Vec<Field>),
 	Enum(String, Vec<EnumValue>),
+}
+
+pub enum Decl {
+	Ty(Type),
+	Fqn(function::Function),
 }
 
 pub trait Name {
