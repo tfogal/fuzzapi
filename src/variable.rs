@@ -15,9 +15,6 @@ pub struct Source {
 	name: String,
 	pub generator: Box<Generator>,
 	pub op: ScalarOp,
-	// There is only ever one parent and/or function.  However we need to store
-	// them in vectors because Rust is annoying and doesn't let us create an
-	// "empty" RefCell.
 	pub parent: Option<Rc<RefCell<Source>>>,
 	fqn: String,
 }
