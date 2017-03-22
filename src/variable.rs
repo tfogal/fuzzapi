@@ -18,6 +18,19 @@ pub struct Source {
 	pub parent: Option<Rc<RefCell<Source>>>,
 	fqn: String,
 }
+
+impl Clone for Source {
+	fn clone(&self) -> Self {
+		Source{name: self.name.clone(), generator: self.generator.clone(),
+		       op: self.op, parent: self.parent.clone(), fqn: self.fqn.clone()}
+	}
+
+	#[allow(unused_variables)]
+	fn clone_from(&mut self, src: &Self) {
+		unimplemented!();
+	}
+}
+
 impl Source {
 	// Construct a free variable of the given type that needs the given ScalarOp.
 	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
@@ -98,7 +111,7 @@ fn gennames(gens: &Vec<Box<Generator>>) -> Vec<String> {
 // A variable has a root type, but when used in functions it may need to be
 // transformed in some way.  The classic example is a stack variable that needs
 // address-of to be passed to a method that accepts it by pointer.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ScalarOp {
 	Null, // no transformation needed
 	Deref, // dereference it once
@@ -652,5 +665,45 @@ impl Generator for GenCString {
 	fn clone(&self) -> Box<Generator> {
 		Box::new(GenCString{idx: self.idx, printable: self.printable.clone(),
 		                    control: self.control.clone()})
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use variable::{ScalarOp, Source};
+	use typ::{Native, Type};
+
+	#[test]
+	fn test_src_clone() {
+		let intg = Type::Builtin(Native::Integer);
+		let it = Source::free("item", &intg, ScalarOp::Null);
+		let cpy = it.clone();
+		use std::ops::Deref;
+		assert_eq!(cpy.borrow().deref().op, it.borrow().deref().op);
+	}
+
+	#[test]
+	fn test_src_clone_multiple() {
+		let intg = Type::Builtin(Native::Integer);
+		let orig = Source::free("item", &intg, ScalarOp::Null);
+		let par = Source::bound(orig, ScalarOp::AddressOf);
+		match par.borrow().parent {
+			None => panic!("no parent?"), _ => {},
+		};
+		let cpy = par.clone();
+		match par.borrow().parent {
+			None => panic!("no parent, 2nd round?"), _ => {},
+		};
+		assert!(cpy.borrow().is_bound());
+	}
+
+	#[test]
+	fn test_src_parent() {
+		let intg = Type::Builtin(Native::Usize);
+		let orig = Source::free("item", &intg, ScalarOp::Null);
+		let par = Source::bound(orig, ScalarOp::AddressOf);
+		let par2: Source = par.borrow().clone();
+		assert!(par.borrow().is_bound());
+		assert!(par2.is_bound());
 	}
 }
