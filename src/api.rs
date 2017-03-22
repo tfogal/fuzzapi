@@ -63,16 +63,16 @@ fn type_from_decl(decl: &DeclType) -> Type {
 			for f in udt {
 				match f.ty {
 					DeclType::Basic(ref ty) =>
-						flds.push(("_unnamed_".to_string(), Box::new(ty.clone()))),
+						flds.push((f.name.clone(), Box::new(ty.clone()))),
 					DeclType::Struct(ref st) => {
 						for s in st {
 							let subtype = type_from_decl(&s.ty);
-							flds.push(("_unnamed2_".to_string(), Box::new(subtype)));
+							flds.push((f.name.clone(), Box::new(subtype)));
 						}
 					},
 					DeclType::Enum(ref en) => {
 						let v = Type::Enum("_unnamed_enum_".to_string(), en.clone());
-						flds.push(("_unnamed3_".to_string(), Box::new(v)));
+						flds.push((f.name.clone(), Box::new(v)));
 					}
 					DeclType::StructRef(/*ref nm*/ _) => unimplemented!(),
 					DeclType::EnumRef(/*ref nm*/ _) => unimplemented!(),
@@ -86,6 +86,15 @@ fn type_from_decl(decl: &DeclType) -> Type {
 	}
 }
 
+/*
+fn func_from_decl(fqn: &FuncDecl) -> function::Function {
+	let mut rv: function::Function = function::Function{
+		name: fqn.name
+	};
+	rv.retval = function::ReturnType::new(type_from_decl(&fqn.retval))
+}
+*/
+
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
 fn resolve_types(decls: &Vec<Declaration>) ->
@@ -98,8 +107,13 @@ fn resolve_types(decls: &Vec<Declaration>) ->
 			&Declaration::Free(ref fvar) => {
 				drv.push(Decl::Ty(type_from_decl(&fvar.ty)));
 			},
-			&Declaration::Function(ref fqn) => {},
-			&Declaration::UDT(ref udecl) => {},
+			&Declaration::Function(_/*ref fqn*/) => {
+				unimplemented!();
+				//drv.push(Decl::Fqn(func_from_decl(fqn)));
+			},
+			&Declaration::UDT(ref udecl) => {
+				drv.push(Decl::Ty(type_from_decl(&udecl.ty)));
+			},
 		};
 	}
 	(drv, vec![])
@@ -131,6 +145,8 @@ mod test {
 				assert_eq!(decllist.len(), 0)
 			},
 		};
+		let (decl, _) = api::resolve_types(&fuzz::parse_L_API(s).unwrap());
+		assert_eq!(decl.len(), 1);
 	}
 
 	#[test]
