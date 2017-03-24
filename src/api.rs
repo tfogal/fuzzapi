@@ -55,7 +55,7 @@ pub enum Declaration {
 // gives the type from the declaration.
 // it needs to take the current type list as well, because this DeclType may
 // reference other types, and it would need to produce boxes to those types.
-fn type_from_decl(decl: &DeclType) -> Type {
+fn type_from_decl(decl: &DeclType, types: &Vec<Decl>) -> Type {
 	match decl {
 		&DeclType::Basic(ref ty) => ty.clone(),
 		&DeclType::Struct(ref udt) => {
@@ -65,16 +65,29 @@ fn type_from_decl(decl: &DeclType) -> Type {
 					DeclType::Basic(ref ty) =>
 						flds.push((f.name.clone(), Box::new(ty.clone()))),
 					DeclType::Struct(ref st) => {
+						/* This should probably be unreachable!()... */
 						for s in st {
-							let subtype = type_from_decl(&s.ty);
+							let subtype = type_from_decl(&s.ty, types);
 							flds.push((f.name.clone(), Box::new(subtype)));
 						}
 					},
-					DeclType::Enum(ref en) => {
-						let v = Type::Enum("_unnamed_enum_".to_string(), en.clone());
-						flds.push((f.name.clone(), Box::new(v)));
-					}
-					DeclType::StructRef(/*ref nm*/ _) => unimplemented!(),
+					DeclType::Enum(_) => unreachable!(),
+					DeclType::StructRef(ref nm) => {
+						for t in types {
+							match t {
+								&Decl::Ty(ref x) => {
+									match x {
+										&Type::Struct(ref tgt, _) if *nm==*tgt => {
+											flds.push((f.name.clone(), Box::new(x.clone())));
+											break;
+										},
+										_ => (),
+									}
+								},
+								_ => (),
+							}
+						}
+					},
 					DeclType::EnumRef(/*ref nm*/ _) => unimplemented!(),
 				}
 			}
@@ -105,14 +118,16 @@ fn resolve_types(decls: &Vec<Declaration>) ->
 	for decl in decls {
 		match decl {
 			&Declaration::Free(ref fvar) => {
-				drv.push(Decl::Ty(type_from_decl(&fvar.ty)));
+				let typedecl: Type = type_from_decl(&fvar.ty, &drv);
+				drv.push(Decl::Ty(typedecl));
 			},
 			&Declaration::Function(_/*ref fqn*/) => {
 				unimplemented!();
 				//drv.push(Decl::Fqn(func_from_decl(fqn)));
 			},
 			&Declaration::UDT(ref udecl) => {
-				drv.push(Decl::Ty(type_from_decl(&udecl.ty)));
+				let typedecl: Type = type_from_decl(&udecl.ty, &drv);
+				drv.push(Decl::Ty(typedecl));
 			},
 		};
 	}
