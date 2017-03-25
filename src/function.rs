@@ -12,6 +12,9 @@ impl Argument {
 	pub fn new(t: &Type, s: Rc<RefCell<Source>>) -> Self {
 		Argument{ty: t.clone(), src: s}
 	}
+	pub fn source(&self) -> Source {
+		return self.src.borrow().clone()
+	}
 }
 
 #[derive(Clone, Debug)]
