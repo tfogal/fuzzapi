@@ -434,7 +434,7 @@ mod test {
 
 	#[test]
 	fn parse_stdgen() {
-		let generators: Vec<Box<variable::Generator>> = {
+		let mut generators: Vec<Box<variable::Generator>> = {
 			let stdgen = "./share/stdgen.hf"; // todo: search path for hf files.
 			let p = Path::new(stdgen);
 			let mut fp = match File::open(&p) {
@@ -452,5 +452,7 @@ mod test {
 			tobox(stdgen)
 		};
 		assert!(generators.len() > 0);
+		generators.append(&mut builtin_generators());
+		generators.append(&mut hash_generators());
 	}
 }
