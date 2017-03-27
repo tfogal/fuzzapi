@@ -432,6 +432,27 @@ fn main() {
 mod test {
 	use super::*;
 
+	fn generators_for_test() -> Vec<Box<variable::Generator>> {
+		let stdgen = "./share/stdgen.hf"; // todo: search path for hf files.
+		let p = Path::new(stdgen);
+		let mut fp = match File::open(&p) {
+			Err(e) => panic!("error reading {}: {}", stdgen, e),
+			Ok(f) => f,
+		};
+		let mut s = String::new();
+		use std::io::Read;
+		fp.read_to_string(&mut s).unwrap();
+		let lgen = generator::parse_LGeneratorList(s.as_str());
+		let stdgen: Vec<UserGen> = match lgen {
+			Err(e) => panic!("err reading {:?}: {:?}", p, e),
+			Ok(a) => a,
+		};
+		let mut gen = tobox(stdgen);
+		gen.append(&mut builtin_generators());
+		gen.append(&mut hash_generators());
+		gen
+	}
+
 	#[test]
 	fn parse_stdgen() {
 		let mut generators: Vec<Box<variable::Generator>> = {
@@ -454,5 +475,35 @@ mod test {
 		assert!(generators.len() > 0);
 		generators.append(&mut builtin_generators());
 		generators.append(&mut hash_generators());
+	}
+
+	#[test]
+	fn test_iter() {
+		let generators = generators_for_test();
+		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
+
+		use variable::ScalarOp;
+		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
+																				 ScalarOp::Null);
+		let genname = "std:opaque:struct hsearch_data*";
+		let hsd_var = variable::Source::free_gen("tbl", genname,
+																						 &generators, ScalarOp::AddressOf);
+		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
+		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let hcreate_args = vec![fa1, fa2];
+
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
+																						 ScalarOp::Null);
+		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
+		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
+
+		let mut functions: Vec<&mut Function> = vec![&mut hcreate];
+		let immut = unsafe {
+			// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
+			mem::transmute::<&Vec<&mut Function>, &Vec<&Function>>(&functions)
+		};
+		while !finished(&immut) {
+			next(&mut functions);
+		}
 	}
 }
