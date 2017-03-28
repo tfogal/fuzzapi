@@ -14,12 +14,40 @@ pub type EnumValue = (String, i64);
 pub type Field = (String, Box<Type>);
 
 // A Type holds the basic immutable type information of the object.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Type {
 	Builtin(Native),
 	Pointer(Box<Type>),
 	Struct(String, Vec<Field>),
 	Enum(String, Vec<EnumValue>),
+	Function(Box<function::Function>)
+}
+
+impl PartialEq for Type {
+	fn eq(&self, other: &Type) -> bool {
+		return match self {
+			&Type::Builtin(ref x) => match other {
+				&Type::Builtin(ref y) => x == y, _ => false
+			},
+			&Type::Pointer(ref x) => match other {
+				&Type::Pointer(ref y) => x == y, _ => false
+			},
+			&Type::Struct(ref s, ref flds) => match other {
+				&Type::Struct(ref t, ref oflds) => s==t && flds==oflds,
+				_ => false,
+			},
+			&Type::Enum(ref s, ref vals) => match other {
+				&Type::Enum(ref t, ref ovals) => s==t && vals==ovals,
+				_ => false,
+			},
+			&Type::Function(ref fqn) => match other {
+				&Type::Function(ref ofqn) => fqn.name == ofqn.name, _ => false,
+			},
+		}
+	}
+	fn ne(&self, other: &Type) -> bool {
+		return !self.eq(other);
+	}
 }
 
 pub enum Decl {
@@ -64,6 +92,7 @@ impl Name for Type {
 			},
 			&Type::Struct(ref udt, _) => udt.clone(),
 			&Type::Enum(ref enm, _) => enm.clone(),
+			&Type::Function(ref fqn) => fqn.name.clone(),
 		}
 	}
 }

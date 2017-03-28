@@ -192,6 +192,7 @@ pub fn generator(t: &Type) -> Box<Generator> {
 				Box::new(GenStruct::create(t))
 			}
 		},
+		&Type::Function(_) => unimplemented!(),
 	}
 }
 
