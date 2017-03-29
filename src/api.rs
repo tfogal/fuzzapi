@@ -5,7 +5,7 @@
 // sense for parsing, because it lets us parse without worrying too
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
-use typ::{Decl, EnumValue, Type};
+use typ::{EnumValue, Type};
 use variable;
 
 #[derive(Debug)]
@@ -55,7 +55,7 @@ pub enum Declaration {
 // gives the type from the declaration.
 // it needs to take the current type list as well, because this DeclType may
 // reference other types, and it would need to produce boxes to those types.
-fn type_from_decl(decl: &DeclType, types: &Vec<Decl>) -> Type {
+fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 	match decl {
 		&DeclType::Basic(ref ty) => ty.clone(),
 		&DeclType::Struct(ref udt) => {
@@ -75,14 +75,9 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Decl>) -> Type {
 					DeclType::StructRef(ref nm) => {
 						for t in types {
 							match t {
-								&Decl::Ty(ref x) => {
-									match x {
-										&Type::Struct(ref tgt, _) if *nm==*tgt => {
-											flds.push((f.name.clone(), Box::new(x.clone())));
-											break;
-										},
-										_ => (),
-									}
+								&Type::Struct(ref tgt, _) if *nm==*tgt => {
+									flds.push((f.name.clone(), Box::new(t.clone())));
+									break;
 								},
 								_ => (),
 							}
@@ -111,15 +106,15 @@ fn func_from_decl(fqn: &FuncDecl) -> function::Function {
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
 fn resolve_types(decls: &Vec<Declaration>) ->
-	(Vec<Decl>, Vec<variable::Source>) {
+	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
-	let mut drv: Vec<Decl> = Vec::new();
+	let mut drv: Vec<Type> = Vec::new();
 
 	for decl in decls {
 		match decl {
 			&Declaration::Free(ref fvar) => {
 				let typedecl: Type = type_from_decl(&fvar.ty, &drv);
-				drv.push(Decl::Ty(typedecl));
+				drv.push(typedecl);
 			},
 			&Declaration::Function(_/*ref fqn*/) => {
 				unimplemented!();
@@ -127,7 +122,7 @@ fn resolve_types(decls: &Vec<Declaration>) ->
 			},
 			&Declaration::UDT(ref udecl) => {
 				let typedecl: Type = type_from_decl(&udecl.ty, &drv);
-				drv.push(Decl::Ty(typedecl));
+				drv.push(typedecl);
 			},
 		};
 	}

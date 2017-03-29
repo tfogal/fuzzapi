@@ -50,11 +50,6 @@ impl PartialEq for Type {
 	}
 }
 
-pub enum Decl {
-	Ty(Type),
-	Fqn(function::Function),
-}
-
 pub trait Name {
 	fn name(&self) -> String;
 }
