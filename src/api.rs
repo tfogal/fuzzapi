@@ -5,6 +5,9 @@
 // sense for parsing, because it lets us parse without worrying too
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
+use std::cell::RefCell;
+use std::rc::Rc;
+use function;
 use typ::{EnumValue, Type};
 use variable;
 
@@ -94,14 +97,27 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 	}
 }
 
-/*
-fn func_from_decl(fqn: &FuncDecl) -> function::Function {
-	let mut rv: function::Function = function::Function{
-		name: fqn.name
+fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>) -> function::Function {
+	let fauxgenlist: Vec<Box<variable::Generator>> =
+		vec![Box::new(variable::GenNothing{})];
+	let nullop = variable::ScalarOp::Null;
+	let fauxsrc : Rc<RefCell<variable::Source>> =
+		variable::Source::free_gen("???", "std:nothing", &fauxgenlist, nullop);
+	let retv = function::ReturnType::new(&type_from_decl(&fqn.retval, &types),
+	                                     fauxsrc);
+	let mut rv = function::Function{
+		name: fqn.name.clone(),
+		arguments: Vec::new(),
+		retval: retv
 	};
-	rv.retval = function::ReturnType::new(type_from_decl(&fqn.retval))
+	for arg in fqn.arguments.iter() {
+		let typedecl: Type = type_from_decl(&arg, &types);
+		let src: Rc<RefCell<variable::Source>> =
+			variable::Source::free_gen("???", "std:nothing", &fauxgenlist, nullop);
+		rv.arguments.push(function::Argument::new(&typedecl, src));
+	}
+	return rv;
 }
-*/
 
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
@@ -116,9 +132,9 @@ fn resolve_types(decls: &Vec<Declaration>) ->
 				let typedecl: Type = type_from_decl(&fvar.ty, &drv);
 				drv.push(typedecl);
 			},
-			&Declaration::Function(_/*ref fqn*/) => {
-				unimplemented!();
-				//drv.push(Decl::Fqn(func_from_decl(fqn)));
+			&Declaration::Function(ref fqn) => {
+				let func = func_from_decl(fqn, &drv);
+				drv.push(Type::Function(Box::new(func)));
 			},
 			&Declaration::UDT(ref udecl) => {
 				let typedecl: Type = type_from_decl(&udecl.ty, &drv);
@@ -335,5 +351,18 @@ mod test {
 			_ => panic!("non function type {:?}", decls[0]),
 		};
 		assert_eq!(fqn.name, "hcreate_r");
+	}
+
+	#[test]
+	fn func_from_decl() {
+		let declint = api::DeclType::Basic(Type::Builtin(Native::Integer));
+		let declszt = api::DeclType::Basic(Type::Builtin(Native::Usize));
+		let fd = api::FuncDecl{
+			name: "hcreate".to_string(),
+			retval: declint,
+			arguments: vec![declszt]
+		};
+		let typelist: Vec<Type> = Vec::new();
+		api::func_from_decl(&fd, &typelist);
 	}
 }
