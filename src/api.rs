@@ -152,7 +152,7 @@ mod test {
 	use typ::{Native, Type};
 
 	#[test]
-	fn test_empty_struct() {
+	fn empty_struct() {
 		let s = "struct entry { }";
 		assert!(fuzz::parse_L_API(s).is_ok());
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
@@ -176,7 +176,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_struct_pointer_char() {
+	fn struct_pointer_char() {
 		let s = "struct Ent { pointer char key; }";
 		assert!(fuzz::parse_L_API(s).is_ok());
 		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
@@ -210,7 +210,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_struct_multiple_fields() {
+	fn struct_multiple_fields() {
 		let s = "struct Entry {\n".to_string() +
 			"pointer char key;\n" +
 			"pointer void value;\n" +
@@ -259,7 +259,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_enum_single() {
+	fn enum_single() {
 		let s = "enum Enumeration { BLAH = 0 , }";
 		match fuzz::parse_L_API(s) {
 			Ok(_) => {},
@@ -271,7 +271,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_enum_multi() {
+	fn enum_multi() {
 		let s = "enum Enumeration { FOO = 0 , BAR = 1 , BAZ = 42 , }";
 		let decls = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
@@ -281,7 +281,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_struct_fvar_single() {
+	fn struct_fvar_single() {
 		let s = "struct X { } var:free blah op:null gen:I32 i32";
 		let decls = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
@@ -291,7 +291,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_parse_function_new() {
+	fn parse_function_new() {
 		let s = "function:new hcreate_r int {usize, pointer struct hsearch_data,}";
 		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
@@ -334,7 +334,7 @@ mod test {
 	}
 
 	#[test]
-	fn test_parse_two_function_decls() {
+	fn parse_two_function_decls() {
 		let s = "function:new hcreate_r int {".to_string() +
 			"usize, pointer struct hsearch_data," +
 		"}" +
