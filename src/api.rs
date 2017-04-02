@@ -121,7 +121,8 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>) -> function::Function {
 
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
-fn resolve_types(decls: &Vec<Declaration>) ->
+fn resolve_types(decls: &Vec<Declaration>,
+                 gen: &Vec<Box<variable::Generator>>) ->
 	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();
@@ -150,6 +151,7 @@ mod test {
 	use api;
 	use fuzz;
 	use typ::{Native, Type};
+	use variable;
 
 	#[test]
 	fn empty_struct() {
@@ -171,7 +173,9 @@ mod test {
 				assert_eq!(decllist.len(), 0)
 			},
 		};
-		let (decl, _) = api::resolve_types(&fuzz::parse_L_API(s).unwrap());
+		let generators: Vec<Box<variable::Generator>> = Vec::new();
+		let (decl, _) =
+			api::resolve_types(&fuzz::parse_L_API(s).unwrap(), &generators);
 		assert_eq!(decl.len(), 1);
 	}
 
