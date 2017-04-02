@@ -97,12 +97,11 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 	}
 }
 
-fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>) -> function::Function {
-	let fauxgenlist: Vec<Box<variable::Generator>> =
-		vec![Box::new(variable::GenNothing{})];
+fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
+                  gen: &Vec<Box<variable::Generator>>) -> function::Function {
 	let nullop = variable::ScalarOp::Null;
 	let fauxsrc : Rc<RefCell<variable::Source>> =
-		variable::Source::free_gen("???", "std:nothing", &fauxgenlist, nullop);
+		variable::Source::free_gen("???", "std:nothing", &gen, nullop);
 	let retv = function::ReturnType::new(&type_from_decl(&fqn.retval, &types),
 	                                     fauxsrc);
 	let mut rv = function::Function{
@@ -113,7 +112,7 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>) -> function::Function {
 	for arg in fqn.arguments.iter() {
 		let typedecl: Type = type_from_decl(&arg, &types);
 		let src: Rc<RefCell<variable::Source>> =
-			variable::Source::free_gen("???", "std:nothing", &fauxgenlist, nullop);
+			variable::Source::free_gen("???", "std:nothing", &gen, nullop);
 		rv.arguments.push(function::Argument::new(&typedecl, src));
 	}
 	return rv;
@@ -134,7 +133,7 @@ fn resolve_types(decls: &Vec<Declaration>,
 				drv.push(typedecl);
 			},
 			&Declaration::Function(ref fqn) => {
-				let func = func_from_decl(fqn, &drv);
+				let func = func_from_decl(fqn, &drv, gen);
 				drv.push(Type::Function(Box::new(func)));
 			},
 			&Declaration::UDT(ref udecl) => {
@@ -366,7 +365,9 @@ mod test {
 			retval: declint,
 			arguments: vec![declszt]
 		};
+		let generators: Vec<Box<variable::Generator>> =
+			vec![Box::new(variable::GenNothing{})];
 		let typelist: Vec<Type> = Vec::new();
-		api::func_from_decl(&fd, &typelist);
+		api::func_from_decl(&fd, &typelist, &generators);
 	}
 }
