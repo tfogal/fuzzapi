@@ -80,11 +80,16 @@ LConstant: ::typ::EnumValue = {
 
 LFreeVar: api::FreeVarDecl = {
 	"var" ":" "free" <id: LIdentifier> <oper: LOperation> "gen" ":"
-		<gen: LIdentifier> <ty: LSimpleType> => {
-		let fauxtype = Type::Builtin(Native::Void);
+		<gen: LIdentifier> <typename: LTypeName> => {
 		api::FreeVarDecl{name: id, op: oper, genname: gen,
-		                 ty: api::DeclType::Basic(fauxtype)}
+		                 ty: typename}
 	}
+};
+
+LTypeName: api::DeclType = {
+	<ty: LSimpleType> => api::DeclType::Basic(Type::Builtin(ty)),
+	"udt" ":" <sref: LIdentifier> => api::DeclType::StructRef(sref),
+	"enum" ":" <eref: LIdentifier> => api::DeclType::EnumRef(eref),
 };
 
 LOperation: variable::ScalarOp = {
