@@ -8,14 +8,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use function;
-use typ::{EnumValue, Type};
+use typ::{EnumValue, Native, Type};
 use variable;
 
 #[derive(Debug)]
 pub enum DeclType {
 	Basic(Type),
-	Struct(Vec<UDTDecl>),
-	Enum(Vec<EnumValue>),
+	Struct(String, Vec<UDTDecl>),
+	Enum(String, Vec<EnumValue>),
 	StructRef(String),
 	EnumRef(String),
 }
@@ -52,7 +52,7 @@ pub struct FuncCall {
 pub enum Declaration {
 	Free(FreeVarDecl),
 	Function(FuncDecl),
-	UDT(UDTDecl),
+	UDT(DeclType), // Error if the DeclType is not a Struct || Enum!
 }
 
 // gives the type from the declaration.
@@ -61,25 +61,23 @@ pub enum Declaration {
 fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 	match decl {
 		&DeclType::Basic(ref ty) => ty.clone(),
-		&DeclType::Struct(ref udt) => {
-			let mut flds: Vec<(String, Box<Type>)> = Vec::new();
-			for f in udt {
+		&DeclType::Struct(ref snm, ref flds) => {
+			let mut flds_rv: Vec<(String, Box<Type>)> = Vec::new();
+			for f in flds {
 				match f.ty {
 					DeclType::Basic(ref ty) =>
-						flds.push((f.name.clone(), Box::new(ty.clone()))),
-					DeclType::Struct(ref st) => {
-						/* This should probably be unreachable!()... */
-						for s in st {
-							let subtype = type_from_decl(&s.ty, types);
-							flds.push((f.name.clone(), Box::new(subtype)));
-						}
+						flds_rv.push((f.name.clone(), Box::new(ty.clone()))),
+					DeclType::Struct(_, _) => {
+						// correct?
+						let subtype = type_from_decl(&f.ty, types);
+						flds_rv.push((f.name.clone(), Box::new(subtype)));
 					},
-					DeclType::Enum(_) => unreachable!(),
+					DeclType::Enum(_, _) => unreachable!(),
 					DeclType::StructRef(ref nm) => {
 						for t in types {
 							match t {
 								&Type::Struct(ref tgt, _) if *nm==*tgt => {
-									flds.push((f.name.clone(), Box::new(t.clone())));
+									flds_rv.push((f.name.clone(), Box::new(t.clone())));
 									break;
 								},
 								_ => (),
@@ -89,10 +87,26 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 					DeclType::EnumRef(/*ref nm*/ _) => unimplemented!(),
 				}
 			}
-			Type::Struct("_unnamed_struct_".to_string(), flds)
+			Type::Struct(snm.clone(), flds_rv)
 		},
-		&DeclType::Enum(_) => unimplemented!(),
-		&DeclType::StructRef(_) => unimplemented!(),
+		&DeclType::Enum(_, _) => unimplemented!(),
+		&DeclType::StructRef(ref nm) => {
+			let mut rv: Type = Type::Builtin(Native::Void);
+			for typex in types {
+				match typex {
+					&Type::Struct(ref strct, _) if strct == nm => rv = typex.clone(),
+					&Type::Struct(ref strct, _) => {
+						println!("struct '{}' is not a match for '{}'", strct, nm);
+					}
+					_ => {},
+				};
+			}
+			/* Didn't find it?  Then bail, unknown type! */
+			if rv == Type::Builtin(Native::Void) {
+				panic!("Unknown struct '{}'!", nm);
+			}
+			rv
+		}
 		&DeclType::EnumRef(_) => unimplemented!(),
 	}
 }
@@ -121,24 +135,30 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
 fn resolve_types(decls: &Vec<Declaration>,
-                 gen: &Vec<Box<variable::Generator>>) ->
+                 gen: &mut Vec<Box<variable::Generator>>) ->
 	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();
 
 	for decl in decls {
 		match decl {
-			&Declaration::Free(ref fvar) => {
-				let typedecl: Type = type_from_decl(&fvar.ty, &drv);
-				drv.push(typedecl);
-			},
+			// Free variables aren't a type definition.  Skip it.
+			&Declaration::Free(_) => {},
 			&Declaration::Function(ref fqn) => {
 				let func = func_from_decl(fqn, &drv, gen);
 				drv.push(Type::Function(Box::new(func)));
 			},
 			&Declaration::UDT(ref udecl) => {
-				let typedecl: Type = type_from_decl(&udecl.ty, &drv);
+				let typedecl: Type = type_from_decl(&udecl, &drv);
 				drv.push(typedecl);
+				let udtname = match udecl {
+					&DeclType::Struct(ref x, _) => x,
+					&DeclType::Enum(ref x, _) => x,
+					_ => panic!("invalid DeclType {:?} for UDT", udecl),
+				};
+				// this hasn't yet been implemented ...
+				println!("WARNING: definition for type '{}' SHOULD add a generator.",
+				         udtname);
 			},
 		};
 	}
@@ -162,19 +182,20 @@ mod test {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
 		};
-		assert_eq!(decl.name, "entry".to_string());
-		match decl.ty {
-			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
-			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
-			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
-			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
-			api::DeclType::Struct(ref decllist) => {
+		use api::DeclType;
+		match decl {
+			&DeclType::Basic(_) => panic!("type should be Struct, is Basic"),
+			&DeclType::Enum(_, _) => panic!("type should be Struct, is Enum"),
+			&DeclType::EnumRef(_) => panic!("type should be Struct, is EnumRef"),
+			&DeclType::StructRef(_) => panic!("type should be Struct, is StructRef"),
+			&DeclType::Struct(ref nm, ref decllist) => {
+				assert_eq!(*nm, "entry".to_string());
 				assert_eq!(decllist.len(), 0)
 			},
 		};
-		let generators: Vec<Box<variable::Generator>> = Vec::new();
+		let mut generators: Vec<Box<variable::Generator>> = Vec::new();
 		let (decl, _) =
-			api::resolve_types(&fuzz::parse_L_API(s).unwrap(), &generators);
+			api::resolve_types(&fuzz::parse_L_API(s).unwrap(), &mut generators);
 		assert_eq!(decl.len(), 1);
 	}
 
@@ -188,19 +209,20 @@ mod test {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
 		};
-		assert_eq!(decl.name, "Ent".to_string());
-		match decl.ty {
-			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
-			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
-			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
-			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
-			api::DeclType::Struct(ref decllist) => {
+		use api::DeclType;
+		match decl {
+			&DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
+			&DeclType::Enum(_, _) => panic!("type should be UDT, is Enum"),
+			&DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
+			&DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
+			&DeclType::Struct(ref nm, ref decllist) => {
+				assert_eq!(*nm, "Ent".to_string());
 				assert_eq!(decllist.len(), 1);
 				let ref key: api::UDTDecl = decllist[0];
 				assert_eq!(key.name, "key");
 				match key.ty {
-					api::DeclType::Struct(_) => panic!("incorrect type UDT for 'key'"),
-					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
+					api::DeclType::Struct(_, _) => panic!("incorrect type UDT for 'key'"),
+					api::DeclType::Enum(_, _) => panic!("incorrect type Enum for 'key'"),
 					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
 					api::DeclType::Basic(ref blt) => {
@@ -225,22 +247,23 @@ mod test {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
 		};
-		assert_eq!(decl.name, "Entry".to_string());
-		match decl.ty {
-			api::DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
-			api::DeclType::Enum(_) => panic!("type should be UDT, is Enum"),
-			api::DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
-			api::DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
-			api::DeclType::Struct(ref decllist) => {
+		use api::DeclType;
+		match decl {
+			&DeclType::Basic(_) => panic!("type should be UDT, is Basic"),
+			&DeclType::Enum(_, _) => panic!("type should be UDT, is Enum"),
+			&DeclType::EnumRef(_) => panic!("type should be UDT, is EnumRef"),
+			&DeclType::StructRef(_) => panic!("type should be UDT, is StructRef"),
+			&DeclType::Struct(ref nm, ref decllist) => {
+				assert_eq!(*nm, "Entry".to_string());
 				assert_eq!(decllist.len(), 2);
 				let ref key: api::UDTDecl = decllist[0];
 				assert_eq!(key.name, "key");
 				match key.ty {
-					api::DeclType::Struct(_) => panic!("incorrect type UDT for 'key'"),
-					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
-					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::Basic(ref blt) => {
+					DeclType::Struct(_, _) => panic!("incorrect type UDT for 'key'"),
+					DeclType::Enum(_, _) => panic!("incorrect type Enum for 'key'"),
+					DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
+					DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
+					DeclType::Basic(ref blt) => {
 						let ch = Type::Builtin(Native::Character);
 						assert_eq!(blt, &Type::Pointer(Box::new(ch)));
 					}
@@ -248,11 +271,11 @@ mod test {
 				let ref value: api::UDTDecl = decllist[1];
 				assert_eq!(value.name, "value");
 				match value.ty {
-					api::DeclType::Struct(_) => panic!("incorrect type UDT for 'key'"),
-					api::DeclType::Enum(_) => panic!("incorrect type Enum for 'key'"),
-					api::DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
-					api::DeclType::Basic(ref blt) => {
+					DeclType::Struct(_, _) => panic!("incorrect type UDT for 'key'"),
+					DeclType::Enum(_, _) => panic!("incorrect type Enum for 'key'"),
+					DeclType::EnumRef(_) => panic!("incorrect type for 'key'"),
+					DeclType::StructRef(_) => panic!("incorrect type for 'key'"),
+					DeclType::Basic(ref blt) => {
 						let ch = Type::Builtin(Native::Void);
 						assert_eq!(blt, &Type::Pointer(Box::new(ch)));
 					}
@@ -369,5 +392,23 @@ mod test {
 			vec![Box::new(variable::GenNothing{})];
 		let typelist: Vec<Type> = Vec::new();
 		api::func_from_decl(&fd, &typelist, &generators);
+	}
+
+	#[test]
+	fn type_resolution() {
+		let s = "struct Entry {\n".to_string() +
+			"pointer char key;\n" +
+			"pointer void value;\n" +
+		"}\n" +
+		"var:free tbl op:addressof gen:opaque udt:Entry";
+		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		let mut generators: Vec<Box<variable::Generator>> =
+			vec![Box::new(variable::GenNothing{})];
+		let (types, srcs) = api::resolve_types(&decls, &mut generators);
+		assert_eq!(types.len(), 1);
+		assert_eq!(srcs.len(), 0);
 	}
 }

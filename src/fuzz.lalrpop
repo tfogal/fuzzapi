@@ -23,13 +23,12 @@ pub L_API : Vec<api::Declaration> = {
 	},
 };
 
-LUDTDecl: api::UDTDecl = {
+LUDTDecl: api::DeclType = {
 	"struct" <nm: LIdentifier> "{" <fields: LField*> "}" => {
-		let udt = api::DeclType::Struct(fields);
-		api::UDTDecl{name: nm, ty: udt}
+		api::DeclType::Struct(nm, fields)
 	},
 	"enum" <nm: LIdentifier> "{" <constant: LConstant+> "}" => {
-		api::UDTDecl{name: nm, ty: api::DeclType::Enum(constant)}
+		api::DeclType::Enum(nm, constant)
 	},
 };
 
