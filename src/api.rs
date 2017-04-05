@@ -411,4 +411,32 @@ mod test {
 		assert_eq!(types.len(), 1);
 		assert_eq!(srcs.len(), 0);
 	}
+
+	#[test]
+	fn opaque_struct_in_function() {
+		let s = "struct hsearch_data {}\n".to_string() +
+		"var:free tbl op:addressof gen:opaque udt:entry\n" +
+		"function:new hcreate_r int {" +
+			"usize, pointer struct hsearch_data,\n" +
+		"}\n";
+		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		assert_eq!(decls.len(), 3);
+		let mut generators: Vec<Box<variable::Generator>> =
+			vec![Box::new(variable::GenNothing{})];
+		let (types, _) = api::resolve_types(&decls, &mut generators);
+		println!("SHOULD assert that there are two generators.");
+		println!("the struct hsearch_data should have a default generator added");
+		//assert_eq!(generators.len(), 2);
+		match types[0] {
+			Type::Struct(ref nm, ref fields) => {
+				assert_eq!(nm, "hsearch_data");
+				assert_eq!(fields.len(), 0);
+			}
+			_ => panic!("first type ({:?}) should be struct hsearch_data", types[0]),
+		};
+		// should assert that the hcreate_r's 2nd arg == types[0].
+	}
 }
