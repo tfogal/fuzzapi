@@ -135,7 +135,7 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
 fn resolve_types(decls: &Vec<Declaration>,
-                 gen: &mut Vec<Box<variable::Generator>>) ->
+                 generators: &mut Vec<Box<variable::Generator>>) ->
 	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();
@@ -145,20 +145,25 @@ fn resolve_types(decls: &Vec<Declaration>,
 			// Free variables aren't a type definition.  Skip it.
 			&Declaration::Free(_) => {},
 			&Declaration::Function(ref fqn) => {
-				let func = func_from_decl(fqn, &drv, gen);
+				let func = func_from_decl(fqn, &drv, generators);
 				drv.push(Type::Function(Box::new(func)));
 			},
 			&Declaration::UDT(ref udecl) => {
 				let typedecl: Type = type_from_decl(&udecl, &drv);
-				drv.push(typedecl);
-				let udtname = match udecl {
-					&DeclType::Struct(ref x, _) => x,
-					&DeclType::Enum(ref x, _) => x,
+				drv.push(typedecl.clone());
+				match udecl {
+					&DeclType::Struct(ref x, _) => {
+						let opaque = variable::GenOpaque::create(&typedecl);
+						generators.push(Box::new(opaque));
+						x
+					},
+					&DeclType::Enum(ref x, _) => {
+						let genenum = variable::GenEnum::create(&typedecl);
+						generators.push(Box::new(genenum));
+						x
+					},
 					_ => panic!("invalid DeclType {:?} for UDT", udecl),
 				};
-				// this hasn't yet been implemented ...
-				println!("WARNING: definition for type '{}' SHOULD add a generator.",
-				         udtname);
 			},
 		};
 	}
@@ -427,9 +432,7 @@ mod test {
 		let mut generators: Vec<Box<variable::Generator>> =
 			vec![Box::new(variable::GenNothing{})];
 		let (types, _) = api::resolve_types(&decls, &mut generators);
-		println!("SHOULD assert that there are two generators.");
-		println!("the struct hsearch_data should have a default generator added");
-		//assert_eq!(generators.len(), 2);
+		assert_eq!(generators.len(), 2);
 		match types[0] {
 			Type::Struct(ref nm, ref fields) => {
 				assert_eq!(nm, "hsearch_data");
@@ -439,4 +442,7 @@ mod test {
 		};
 		// should assert that the hcreate_r's 2nd arg == types[0].
 	}
+
+	// should have a test that resolve_type's with an enum and verify that the a
+	// generator is created for that enum...
 }
