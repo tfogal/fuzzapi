@@ -145,9 +145,9 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
 
-	// todo: we need to derive some ordering for functions so that we can do this
-	// properly. for now we just decree that the functions are given in the order
-	// that it makes sense to call them...
+	// todo: we need something more intelligent than just a list of functions,
+	// something more like an AST.  For now we just decree that the functions are
+	// given in the order they should be called...
 	try!(writeln!(strm, "int main() {{"));
 
 	for fqn in fqns {
