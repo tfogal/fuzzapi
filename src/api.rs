@@ -445,6 +445,22 @@ mod test {
 		// should assert that the hcreate_r's 2nd arg == types[0].
 	}
 
-	// should have a test that resolve_type's with an enum and verify that the a
-	// generator is created for that enum...
+	#[test]
+	fn enum_resolves_with_generator() {
+		let s = "enum ACTION { ENTER=0, FIND=1, }\n";
+		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s) {
+			Ok(parsed) => parsed,
+			Err(e) => panic!("{:?}", e),
+		};
+		assert_eq!(decls.len(), 1);
+		let mut generators: Vec<Box<variable::Generator>> =
+			vec![Box::new(variable::GenNothing{})];
+		let (types, _) = api::resolve_types(&decls, &mut generators);
+		assert_eq!(generators.len(), 2);
+		assert_eq!(types.len(), 1);
+		match types[0] {
+			Type::Enum(ref enm, _) => assert_eq!(enm, "ACTION"),
+			_ => (),
+		};
+	}
 }
