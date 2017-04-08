@@ -327,26 +327,30 @@ fn hash_generators() -> Vec<Box<variable::Generator>> {
 	return rv;
 }
 
+// parses user generators from the given file.
+fn parse_generators(fname: &str) -> Vec<Box<variable::Generator>> {
+	let p = Path::new(fname);
+	let mut fp = match File::open(&p) {
+		Err(e) => panic!("error reading {}: {}", fname, e),
+		Ok(f) => f,
+	};
+	let mut s = String::new();
+	use std::io::Read;
+	fp.read_to_string(&mut s).unwrap();
+	let lgen = generator::parse_LGeneratorList(s.as_str());
+	let stdgen: Vec<UserGen> = match lgen {
+		Err(e) => panic!("err reading {:?}: {:?}", p, e),
+		Ok(a) => a,
+	};
+	tobox(stdgen)
+}
+
 fn main() {
 	let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
 
-	let mut generators: Vec<Box<variable::Generator>> = {
-		let p = Path::new("../share/stdgen.hf"); // todo: search path for hf files
-		let mut fp = match File::open(&p) {
-			Err(e) => panic!("error reading fuzz: {}", e),
-			Ok(f) => f,
-		};
-		let mut s = String::new();
-		use std::io::Read;
-		fp.read_to_string(&mut s).unwrap();
-		let lgen = generator::parse_LGeneratorList(s.as_str());
-		let stdgen: Vec<UserGen> = match lgen {
-			Err(e) => panic!("err reading {:?}: {:?}", p, e),
-			Ok(a) => a,
-		};
-		tobox(stdgen)
-	};
+	// todo: search path for hf files.
+	let mut generators = parse_generators("../share/stdgen.hf");
 	generators.append(&mut builtin_generators());
 	generators.append(&mut hash_generators());
 	let generators: Vec<Box<variable::Generator>> = generators; // drop mut.
@@ -433,21 +437,7 @@ mod test {
 	use super::*;
 
 	fn generators_for_test() -> Vec<Box<variable::Generator>> {
-		let stdgen = "./share/stdgen.hf"; // todo: search path for hf files.
-		let p = Path::new(stdgen);
-		let mut fp = match File::open(&p) {
-			Err(e) => panic!("error reading {}: {}", stdgen, e),
-			Ok(f) => f,
-		};
-		let mut s = String::new();
-		use std::io::Read;
-		fp.read_to_string(&mut s).unwrap();
-		let lgen = generator::parse_LGeneratorList(s.as_str());
-		let stdgen: Vec<UserGen> = match lgen {
-			Err(e) => panic!("err reading {:?}: {:?}", p, e),
-			Ok(a) => a,
-		};
-		let mut gen = tobox(stdgen);
+		let mut gen = parse_generators("./share/stdgen.hf"); // todo search path
 		gen.append(&mut builtin_generators());
 		gen.append(&mut hash_generators());
 		gen
@@ -455,23 +445,7 @@ mod test {
 
 	#[test]
 	fn parse_stdgen() {
-		let mut generators: Vec<Box<variable::Generator>> = {
-			let stdgen = "./share/stdgen.hf"; // todo: search path for hf files.
-			let p = Path::new(stdgen);
-			let mut fp = match File::open(&p) {
-				Err(e) => panic!("error reading {}: {}", stdgen, e),
-				Ok(f) => f,
-			};
-			let mut s = String::new();
-			use std::io::Read;
-			fp.read_to_string(&mut s).unwrap();
-			let lgen = generator::parse_LGeneratorList(s.as_str());
-			let stdgen: Vec<UserGen> = match lgen {
-				Err(e) => panic!("err reading {:?}: {:?}", p, e),
-				Ok(a) => a,
-			};
-			tobox(stdgen)
-		};
+		let mut generators = parse_generators("./share/stdgen.hf"); // todo search
 		assert!(generators.len() > 0);
 		generators.append(&mut builtin_generators());
 		generators.append(&mut hash_generators());
