@@ -414,6 +414,7 @@ impl GenStruct {
 			&Type::Struct(_, ref flds) => flds.clone(),
 			_ => panic!("invalid struct type"),
 		};
+		assert_eq!(fld.len(), val.len());
 		GenStruct{
 			fields: fld,
 			values: val,
