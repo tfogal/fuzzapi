@@ -89,7 +89,9 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 			}
 			Type::Struct(snm.clone(), flds_rv)
 		},
-		&DeclType::Enum(_, _) => unimplemented!(),
+		&DeclType::Enum(ref enm, ref evalues) => {
+			Type::Enum(enm.clone(), evalues.clone())
+		},
 		&DeclType::StructRef(ref nm) => {
 			let mut rv: Type = Type::Builtin(Native::Void);
 			for typex in types {
