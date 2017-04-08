@@ -1,4 +1,4 @@
-// This houses our AST types for parsing generator definitions.
+// This houses our types from parsed generator definitions.
 extern crate rand;
 use std::fmt;
 use rand::distributions::{IndependentSample, Range};
