@@ -183,8 +183,6 @@ pub fn generator(t: &Type) -> Box<Generator> {
 			} => Box::new(GenCString::create(t)),
 		// Pointers to anything else are just generic pointers...
 		&Type::Pointer(_) => Box::new(GenPointer::create(t)),
-		// todo fixme how are fields handled now...?
-		//&Type::Field(_, ref x) => generator(x),
 		&Type::Struct(_, ref flds) => {
 			if flds.len() == 0 {
 				Box::new(GenOpaque::create(t))
