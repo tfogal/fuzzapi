@@ -480,4 +480,66 @@ mod test {
 			next(&mut functions);
 		}
 	}
+
+	#[test]
+	fn nonzero_num_iter() {
+		let generators = generators_for_test();
+		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
+
+		use variable::ScalarOp;
+		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
+																				 ScalarOp::Null);
+		let genname = "std:opaque:struct hsearch_data*";
+		let hsd_var = variable::Source::free_gen("tbl", genname,
+																						 &generators, ScalarOp::AddressOf);
+		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
+		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let hcreate_args = vec![fa1, fa2];
+
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
+																						 ScalarOp::Null);
+		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
+		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
+
+		let functions: Vec<&mut Function> = vec![&mut hcreate];
+		let immut = unsafe {
+			// &Vec<&mut T> doesn't coerce to &Vec<&T>.  Really.
+			mem::transmute::<&Vec<&mut Function>, &Vec<&Function>>(&functions)
+		};
+
+		let nstates = immut.iter().fold(1, |n: usize, ref fqn| {
+			let narg = fqn.arguments.iter().fold(1, |na: usize, ref arg| {
+				return na*arg.source().generator.n_state();
+			});
+			return n*narg;
+		});
+		assert_eq!(nstates, 4);
+	}
+
+	#[test]
+	fn compile_generated_program() {
+		let generators = generators_for_test();
+		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
+
+		use variable::ScalarOp;
+		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
+																				 ScalarOp::Null);
+		let genname = "std:opaque:struct hsearch_data*";
+		let hsd_var = variable::Source::free_gen("tbl", genname,
+																						 &generators, ScalarOp::AddressOf);
+		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
+		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let hcreate_args = vec![fa1, fa2];
+
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
+																						 ScalarOp::Null);
+		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
+		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
+
+		let mut functions: Vec<&mut Function> = vec![&mut hcreate];
+		match compile_and_test(&mut functions) {
+			Err(e) => panic!("compile/test error: {}", e),
+			Ok(_) => {},
+		};
+	}
 }
