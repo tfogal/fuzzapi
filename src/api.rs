@@ -138,14 +138,19 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 // potentially panic'ing due to invalid semantics.
 pub fn resolve_types(decls: &Vec<Declaration>,
                      generators: &mut Vec<Box<variable::Generator>>) ->
-	(Vec<Type>, Vec<variable::Source>) {
+	(Vec<Type>, Vec<Rc<RefCell<variable::Source>>>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();
+	let mut vars: Vec<Rc<RefCell<variable::Source>>> = Vec::new();
 
 	for decl in decls {
 		match decl {
-			// Free variables aren't a type definition.  Skip it.
-			&Declaration::Free(_) => {},
+			&Declaration::Free(ref fr) => {
+				let gname = if fr.genname == "opaque" { "std:opaque".to_string() } else {
+fr.genname.clone() };
+				let fvar = variable::Source::free_gen(&fr.name, &gname, generators, fr.op);
+				vars.push(fvar);
+			},
 			&Declaration::Function(ref fqn) => {
 				let func = func_from_decl(fqn, &drv, generators);
 				drv.push(Type::Function(Box::new(func)));
