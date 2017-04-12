@@ -136,8 +136,8 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 
 // replaces the "Decl" types from this module with the typ::* counterparts,
 // potentially panic'ing due to invalid semantics.
-fn resolve_types(decls: &Vec<Declaration>,
-                 generators: &mut Vec<Box<variable::Generator>>) ->
+pub fn resolve_types(decls: &Vec<Declaration>,
+                     generators: &mut Vec<Box<variable::Generator>>) ->
 	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();

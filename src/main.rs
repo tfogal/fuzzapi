@@ -345,6 +345,25 @@ fn parse_generators(fname: &str) -> Vec<Box<variable::Generator>> {
 	tobox(stdgen)
 }
 
+fn parse_types(fname: &str, mut generators: &mut Vec<Box<variable::Generator>>)
+	-> Vec<Type> {
+	let p = Path::new(fname);
+	let mut fp = match File::open(&p) {
+		Err(e) => panic!("error reading {}: {}", fname, e),
+		Ok(f) => f,
+	};
+	let mut s = String::new();
+	use std::io::Read;
+	fp.read_to_string(&mut s).unwrap();
+	let decls: Vec<api::Declaration> = match fuzz::parse_L_API(&s) {
+		Err(e) => panic!("error parsing {}: {:?}", fname, e),
+		Ok(x) => x,
+	};
+
+	let (types, _) = api::resolve_types(&decls, &mut generators);
+	return types;
+}
+
 fn main() {
 	let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 	let hs_data_ptr: Type = Type::Pointer(Box::new(hs_data.clone()));
@@ -435,6 +454,7 @@ fn main() {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use std::fs::File;
 
 	fn generators_for_test() -> Vec<Box<variable::Generator>> {
 		let mut gen = parse_generators("./share/stdgen.hf"); // todo search path
@@ -541,5 +561,41 @@ mod test {
 			Err(e) => panic!("compile/test error: {}", e),
 			Ok(_) => {},
 		};
+	}
+
+	#[test]
+	fn parse_hash_decls() {
+		let s = "struct hsearch_data {}\n".to_string() +
+			"function:new hcreate_r int {\n" +
+				"usize, pointer struct hsearch_data,\n" +
+			"}\n" +
+			"function:new hsearch_r int {\n" +
+				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
+			"}";
+		let fname = ".parse_hash_decls_tmp";
+		let p = Path::new(fname);
+		let mut fp: File = match File::create(fname) {
+			Err(e) => panic!("could not open {}: {:?}", fname, e),
+			Ok(x) => x,
+		};
+		use std::io::Write;
+		match fp.write(s.as_bytes()) {
+			Err(e) => {
+				match std::fs::remove_file(p) { _ => () };
+				panic!("write of {} failed: {}", fname, e);
+			},
+			Ok(_) => (),
+		};
+		drop(fp);
+
+		let mut generators: Vec<Box<variable::Generator>> =
+			vec![Box::new(variable::GenNothing{})];
+		let types = parse_types(fname, &mut generators);
+		match std::fs::remove_file(p) {
+			Err(e) => panic!("error removing {:?}: {}", p, e),
+			_ => (),
+		};
+		assert_eq!(types.len(), 3);
+		// todo: should assert properties of those types
 	}
 }
