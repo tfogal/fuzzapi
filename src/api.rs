@@ -20,6 +20,19 @@ pub enum DeclType {
 	EnumRef(String),
 }
 
+impl DeclType {
+	fn typename(&self) -> String {
+		use typ::Name;
+		match self {
+			&DeclType::Basic(ref ty) => ty.name(),
+			&DeclType::Struct(ref nm, _) => nm.clone(),
+			&DeclType::Enum(ref nm, _) => nm.clone(),
+			&DeclType::StructRef(ref to) => to.clone(),
+			&DeclType::EnumRef(ref to) => to.clone(),
+		}
+	}
+}
+
 #[derive(Debug)]
 pub struct UDTDecl {
 	pub name: String,
@@ -146,9 +159,13 @@ pub fn resolve_types(decls: &Vec<Declaration>,
 	for decl in decls {
 		match decl {
 			&Declaration::Free(ref fr) => {
-				let gname = if fr.genname == "opaque" { "std:opaque".to_string() } else {
-fr.genname.clone() };
-				let fvar = variable::Source::free_gen(&fr.name, &gname, generators, fr.op);
+				let gname: String = if fr.genname == "opaque" {
+					"std:opaque:".to_string() + &fr.ty.typename()
+				} else {
+					fr.genname.clone()
+				};
+				let fvar = variable::Source::free_gen(&fr.name, &gname, generators,
+				                                      fr.op);
 				vars.push(fvar);
 			},
 			&Declaration::Function(ref fqn) => {
@@ -427,7 +444,7 @@ mod test {
 	#[test]
 	fn opaque_struct_in_function() {
 		let s = "struct hsearch_data {}\n".to_string() +
-		"var:free tbl op:addressof gen:opaque udt:entry\n" +
+		"var:free tbl op:addressof gen:opaque udt:hsearch_data\n" +
 		"function:new hcreate_r int {" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n";

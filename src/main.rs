@@ -566,6 +566,7 @@ mod test {
 	#[test]
 	fn parse_hash_decls() {
 		let s = "struct hsearch_data {}\n".to_string() +
+			"var:free tbl op:addressof gen:opaque udt:hsearch_data\n" +
 			"function:new hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +
@@ -596,6 +597,9 @@ mod test {
 			_ => (),
 		};
 		assert_eq!(types.len(), 3);
+		for t in types {
+			println!("\t{:?}", t);
+		}
 		// todo: should assert properties of those types
 	}
 }
