@@ -85,6 +85,15 @@ impl Source {
 	pub fn is_retval(&self) -> bool {
 		return self.fqn.len() != 0;
 	}
+
+	// Follows the links of parent chains until it gets to a root.
+	pub fn root(&self) -> Source {
+		use std::ops::Deref;
+		match self.parent {
+			Some(ref p) => p.borrow().deref().root(),
+			None => self.clone(),
+		}
+	}
 }
 
 impl Name for Source {
@@ -705,5 +714,7 @@ mod test {
 		let par2: Source = par.borrow().clone();
 		assert!(par.borrow().is_bound());
 		assert!(par2.is_bound());
+		let rt = par.borrow().root();
+		assert_eq!(rt.name, "item");
 	}
 }
