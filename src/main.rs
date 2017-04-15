@@ -463,6 +463,24 @@ mod test {
 		gen
 	}
 
+	// dumps WHAT into the file named TO.  panics on any errors.
+	fn dump(to: &str, what: &str) {
+		let p = Path::new(to);
+		let mut fp: File = match File::create(to) {
+			Err(e) => panic!("could not open {}: {:?}", to, e),
+			Ok(x) => x,
+		};
+		use std::io::Write;
+		match fp.write(what.as_bytes()) {
+			Err(e) => {
+				match std::fs::remove_file(p) { _ => () };
+				panic!("write of {} failed: {}", to, e);
+			},
+			Ok(_) => (),
+		};
+		drop(fp);
+	}
+
 	#[test]
 	fn parse_stdgen() {
 		let mut generators = parse_generators("./share/stdgen.hf"); // todo search
@@ -574,26 +592,13 @@ mod test {
 				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 			"}";
 		let fname = ".parse_hash_decls_tmp";
-		let p = Path::new(fname);
-		let mut fp: File = match File::create(fname) {
-			Err(e) => panic!("could not open {}: {:?}", fname, e),
-			Ok(x) => x,
-		};
-		use std::io::Write;
-		match fp.write(s.as_bytes()) {
-			Err(e) => {
-				match std::fs::remove_file(p) { _ => () };
-				panic!("write of {} failed: {}", fname, e);
-			},
-			Ok(_) => (),
-		};
-		drop(fp);
+		dump(fname, &s);
 
 		let mut generators: Vec<Box<variable::Generator>> =
 			vec![Box::new(variable::GenNothing{})];
 		let types = parse_types(fname, &mut generators);
-		match std::fs::remove_file(p) {
-			Err(e) => panic!("error removing {:?}: {}", p, e),
+		match std::fs::remove_file(fname) {
+			Err(e) => panic!("error removing {:?}: {}", fname, e),
 			_ => (),
 		};
 		assert_eq!(types.len(), 3);
