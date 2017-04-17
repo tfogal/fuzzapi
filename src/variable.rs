@@ -16,13 +16,15 @@ pub struct Source {
 	pub generator: Box<Generator>,
 	pub op: ScalarOp,
 	pub parent: Option<Rc<RefCell<Source>>>,
+	pub ty: Type,
 	fqn: String,
 }
 
 impl Clone for Source {
 	fn clone(&self) -> Self {
 		Source{name: self.name.clone(), generator: self.generator.clone(),
-		       op: self.op, parent: self.parent.clone(), fqn: self.fqn.clone()}
+		       op: self.op, parent: self.parent.clone(), ty: self.ty.clone(),
+		       fqn: self.fqn.clone()}
 	}
 
 	#[allow(unused_variables)]
@@ -37,6 +39,7 @@ impl Source {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: generator(ty), op: o,
 			parent: None,
+			ty: ty.clone(),
 			fqn: "".to_string(),
 		}))
 	}
@@ -50,9 +53,11 @@ impl Source {
 			               gennames(&list)),
 			Some(x) => x,
 		};
+		println!("WARNING: using broken type.");
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: g, op: o,
 			parent: None,
+			ty: Type::Builtin(Native::U8), /* FIXME, broken! */
 			fqn: "".to_string(),
 		}))
 	}
@@ -65,9 +70,11 @@ impl Source {
 
 	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) ->
 		Rc<RefCell<Source>> {
+		let typesave =  { parent.borrow().ty.clone() };
 		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
 			parent: Some(parent),
+			ty: typesave,
 			fqn: "".to_string(),
 		}))
 	}
@@ -76,9 +83,11 @@ impl Source {
 	}
 
 	pub fn retval(name: &str, fqn: &str, oper: ScalarOp) -> Rc<RefCell<Source>> {
+		println!("WARNING: using broken retval type");
 		Rc::new(RefCell::new(Source{
 			name: name.to_string(), generator: Box::new(GenNothing{}), op: oper,
 			parent: None,
+			ty: Type::Builtin(Native::U8), /* FIXME broken */
 			fqn: fqn.to_string(),
 		}))
 	}
