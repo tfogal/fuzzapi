@@ -50,6 +50,16 @@ impl PartialEq for Type {
 	}
 }
 
+impl Type {
+	pub fn dereference(&self) -> Type {
+		use std::ops::Deref;
+		match self {
+			&Type::Pointer(ref inner) => inner.deref().clone(),
+			_ => panic!("Can't deref a non-pointer type!"),
+		}
+	}
+}
+
 pub trait Name {
 	fn name(&self) -> String;
 }
