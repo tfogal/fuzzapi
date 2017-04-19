@@ -51,6 +51,7 @@ impl PartialEq for Type {
 }
 
 impl Type {
+	// Remove one layer of pointer type.  Must be a Type::Pointer!
 	pub fn dereference(&self) -> Type {
 		use std::ops::Deref;
 		match self {
