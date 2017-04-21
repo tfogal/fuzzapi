@@ -15,7 +15,7 @@ pub enum Expression {
 }
 
 impl Expression {
-	pub fn exprtype(&self) -> Type {
+	pub fn extype(&self) -> Type {
 		match self {
 			&Expression::Simple(ref op, ref src) => {
 				let tbasic = src.root();
@@ -62,4 +62,18 @@ pub enum Statement {
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
 	/* should have 'if' and 'loop' etc. */
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn simple() {
+		let op = variable::ScalarOp::Null;
+		let src = variable::Source::free("varname", &Type::Builtin(Native::I32), op);
+		use std::ops::Deref;
+		let expr = Expression::Simple(op, src.deref().borrow().clone());
+		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
+	}
 }
