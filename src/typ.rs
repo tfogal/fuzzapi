@@ -1,13 +1,44 @@
 use function;
 
 // A Native type is a type that is builtin to the language.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Native {
 	U8, U16, U32, U64, Unsigned, Usize,
 	I8, I16, I32, I64, Integer,
 	F32, F64,
 	Character,
 	Void,
+}
+
+impl Native {
+	// True if this type is "wider" than the given Native type.  Wider means that
+	// it is always safe to assign a narrower-type to the wider-type, and almost
+	// always unsafe to assign the other way.
+	// These do not follow C rules, and are intended to be more restrictive and
+	// force the user to cast.  Notable exceptions:
+	//   - Usize is assumed to be 32bit, even on 64bit hosts.
+	//   - Integer is assumed to be 32bit
+	//   - Characters are not integer types at all, and thus never "wider".
+	//   - Floating point values are not integer types and cannot be wider or
+	//     narrower than their integer counterparts.
+	pub fn wider(&self, other: Native) -> bool {
+		match self {
+			&Native::U8 => false,
+			&Native::U16 if other == Native::U8 => true,
+			&Native::U32 if other == Native::U8 || other == Native::U16 => true,
+			&Native::Usize if other == Native::U8 || other == Native::U16 => true,
+			&Native::U64 if other == Native::U8 || other == Native::U16 ||
+			                other == Native::U32 => true,
+			&Native::I8 => false,
+			&Native::I16 if other == Native::I8 => true,
+			&Native::I32 if other == Native::I8 || other == Native::I16 => true,
+			&Native::Integer if other == Native::I8 || other == Native::I16 => true,
+			&Native::I64 if other == Native::I8 || other == Native::I16 ||
+			                other == Native::I32 => true,
+			&Native::F64 if other == Native::F32 => true,
+			_ => false,
+		}
+	}
 }
 
 pub type EnumValue = (String, i64);
