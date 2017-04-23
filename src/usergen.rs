@@ -6,9 +6,31 @@ use rand::distributions::{IndependentSample, Range};
 use typ::*;
 use variable::Generator;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Opcode {
 	Add, Sub, Mul, Div, Mod,
+}
+impl Opcode {
+	// Given a left hand side type and a right hand side type, derive the
+	// appropriate for the combined expression "lhs op rhs".
+	// todo: return a proper error
+	pub fn result_type(&self, lhs: Type, rhs: Type) -> Type {
+		let natlhs = match lhs {
+			Type::Builtin(n) => n,
+			_ => unimplemented!(), // only builtin types implemented, for now.
+		};
+		let natrhs = match rhs {
+			Type::Builtin(n) => n,
+			_ => unimplemented!(), // only builtin types implemented, for now.
+		};
+		if natlhs.wider(natrhs) || natlhs == natrhs {
+			return Type::Builtin(natlhs);
+		} else if natrhs.wider(natlhs) {
+			return Type::Builtin(natrhs);
+		}
+		// only widening conversions are allowed.
+		panic!("incompatible expression: {:?} {:?} {:?}", lhs, self, rhs);
+	}
 }
 
 #[derive(Clone)]
