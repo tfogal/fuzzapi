@@ -25,6 +25,11 @@ impl Expression {
 					&variable::ScalarOp::AddressOf => Type::Pointer(Box::new(tbasic.ty)),
 				}
 			}
+			&Expression::Compound(ref lhs, ref op, ref rhs) => {
+				let l = lhs.extype();
+				let r = rhs.extype();
+				op.result_type(l, r)
+			},
 			_ => unimplemented!(),
 		}
 	}
