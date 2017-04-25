@@ -74,11 +74,23 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn simple() {
+	fn simple_expr_type() {
 		let op = variable::ScalarOp::Null;
 		let src = variable::Source::free("varname", &Type::Builtin(Native::I32), op);
 		use std::ops::Deref;
 		let expr = Expression::Simple(op, src.deref().borrow().clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
+	}
+
+	#[test]
+	fn compound_expr_type() {
+		use std::ops::Deref;
+		let null = variable::ScalarOp::Null;
+		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), null);
+		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), null);
+		let el = Box::new(Expression::Simple(null, l.deref().borrow().clone()));
+		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
+		let compound = Expression::Compound(el, Opcode::Add, er);
+		assert_eq!(compound.extype(), Type::Builtin(Native::I32));
 	}
 }
