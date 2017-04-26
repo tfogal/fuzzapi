@@ -75,11 +75,28 @@ mod test {
 
 	#[test]
 	fn simple_expr_type() {
-		let op = variable::ScalarOp::Null;
-		let src = variable::Source::free("varname", &Type::Builtin(Native::I32), op);
+		let null = variable::ScalarOp::Null;
+		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
+		                                 null);
 		use std::ops::Deref;
-		let expr = Expression::Simple(op, src.deref().borrow().clone());
+		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
+		assert_eq!(expr.codegen(), "varname");
+		drop(expr);
+
+		// make sure address of affects codegen.
+		let addrof = variable::ScalarOp::AddressOf;
+		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), null);
+		let expr = Expression::Simple(addrof, v2.deref().borrow().clone());
+		assert_eq!(expr.codegen(), "&var2");
+		drop(expr);
+
+		// make sure deref affects codegen.
+		let addrof = variable::ScalarOp::Deref;
+		let ptr = Type::Pointer(Box::new(Type::Builtin(Native::I32)));
+		let v3 = variable::Source::free("var3", &ptr, null);
+		let expr = Expression::Simple(addrof, v3.deref().borrow().clone());
+		assert_eq!(expr.codegen(), "*var3");
 	}
 
 	#[test]
