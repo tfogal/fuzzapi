@@ -14,6 +14,8 @@ use tc::*;
 pub struct Source {
 	name: String,
 	pub generator: Box<Generator>,
+	// todo fixme: Source should not have a ScalarOp attached.  That should be in
+	// Expression or similar.
 	pub op: ScalarOp,
 	pub parent: Option<Rc<RefCell<Source>>>,
 	pub ty: Type,
@@ -33,6 +35,10 @@ impl Clone for Source {
 	}
 }
 
+// todo fixme: the creation functions on Source should not create an
+// Rc<RefCell<Source>>.  The fact that there's an Rc<> for these should be
+// transparent to the user; we should somehow hide this aspect of the data
+// structure, potentially by using a higher-level data structure.
 impl Source {
 	// Construct a free variable of the given type that needs the given ScalarOp.
 	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
