@@ -32,6 +32,17 @@ impl Opcode {
 		panic!("incompatible expression: {:?} {:?} {:?}", lhs, self, rhs);
 	}
 }
+impl fmt::Display for Opcode {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			&Opcode::Add => write!(f, "+"),
+			&Opcode::Sub => write!(f, "-"),
+			&Opcode::Mul => write!(f, "*"),
+			&Opcode::Div => write!(f, "/"),
+			&Opcode::Mod => write!(f, "%"),
+		}
+	}
+}
 
 #[derive(Clone)]
 pub struct UserGen {
