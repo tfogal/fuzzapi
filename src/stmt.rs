@@ -57,6 +57,9 @@ impl Code for Expression {
 				}
 				rv
 			},
+			&Expression::Compound(ref lhs, ref op, ref rhs) => {
+				lhs.codegen() + op.to_string().as_str() + rhs.codegen().as_str()
+			},
 			_ => unimplemented!(),
 		}
 	}
@@ -74,7 +77,7 @@ mod test {
 	use super::*;
 
 	#[test]
-	fn simple_expr_type() {
+	fn simple_expr() {
 		let null = variable::ScalarOp::Null;
 		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
 		                                 null);
@@ -100,7 +103,7 @@ mod test {
 	}
 
 	#[test]
-	fn compound_expr_type() {
+	fn compound_expr() {
 		use std::ops::Deref;
 		let null = variable::ScalarOp::Null;
 		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), null);
@@ -109,5 +112,6 @@ mod test {
 		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
 		let compound = Expression::Compound(el, Opcode::Add, er);
 		assert_eq!(compound.extype(), Type::Builtin(Native::I32));
+		assert_eq!(compound.codegen(), "LHS+RHS");
 	}
 }
