@@ -8,6 +8,7 @@ trait Code {
 	fn codegen(&self) -> String;
 }
 
+#[derive(Clone,Debug)]
 pub enum Expression {
 	Simple(variable::ScalarOp, variable::Source),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
@@ -102,6 +103,13 @@ mod test {
 		assert_eq!(expr.codegen(), "*var3");
 	}
 
+	macro_rules! compoundtest {
+		($left:expr, $op:expr, $right:expr, $gennedcode:expr) => (
+			let cp_ = Expression::Compound($left.clone(), $op, $right.clone());
+			assert_eq!(cp_.codegen(), $gennedcode);
+			drop(cp_);
+		)
+	}
 	#[test]
 	fn compound_expr() {
 		use std::ops::Deref;
@@ -110,8 +118,10 @@ mod test {
 		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), null);
 		let el = Box::new(Expression::Simple(null, l.deref().borrow().clone()));
 		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
-		let compound = Expression::Compound(el, Opcode::Add, er);
-		assert_eq!(compound.extype(), Type::Builtin(Native::I32));
-		assert_eq!(compound.codegen(), "LHS+RHS");
+		compoundtest!(el, Opcode::Add, er, "LHS+RHS");
+		compoundtest!(el, Opcode::Sub, er, "LHS-RHS");
+		compoundtest!(el, Opcode::Mul, er, "LHS*RHS");
+		compoundtest!(el, Opcode::Div, er, "LHS/RHS");
+		compoundtest!(el, Opcode::Mod, er, "LHS%RHS");
 	}
 }
