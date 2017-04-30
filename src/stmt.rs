@@ -31,7 +31,9 @@ impl Expression {
 				let r = rhs.extype();
 				op.result_type(l, r)
 			},
-			_ => unimplemented!(),
+			&Expression::FqnCall(ref fqn) => {
+				fqn.retval.ty.clone()
+			},
 		}
 	}
 }
