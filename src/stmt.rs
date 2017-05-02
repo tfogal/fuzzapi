@@ -126,4 +126,14 @@ mod test {
 		compoundtest!(el, Opcode::Div, er, "LHS/RHS");
 		compoundtest!(el, Opcode::Mod, er, "LHS%RHS");
 	}
+
+	#[test]
+	fn fqn_expr() {
+		let null = variable::ScalarOp::Null;
+		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), null);
+		let rv = ReturnType::new(&Type::Builtin(Native::I32), r);
+		let fqn = Function::new("f", &rv, &vec![]);
+		let fexpr = Expression::FqnCall(fqn);
+		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
+	}
 }
