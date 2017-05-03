@@ -15,6 +15,10 @@ impl Argument {
 	pub fn source(&self) -> Source {
 		return self.src.borrow().clone()
 	}
+
+	pub fn codegen(&self) -> String {
+		self.src.borrow().name()
+	}
 }
 
 #[derive(Clone, Debug)]
