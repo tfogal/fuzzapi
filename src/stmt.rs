@@ -63,7 +63,18 @@ impl Code for Expression {
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				lhs.codegen() + op.to_string().as_str() + rhs.codegen().as_str()
 			},
-			_ => unimplemented!(),
+			&Expression::FqnCall(ref fqn) => {
+				let mut rv = String::new();
+				write!(&mut rv, "{}(", fqn.name);
+				for (a, arg) in fqn.arguments.iter().enumerate() {
+					write!(&mut rv, "{}", arg.codegen());
+					if a != fqn.arguments.len()-1 {
+						write!(&mut rv, ", ");
+					}
+				}
+				write!(&mut rv, ")");
+				rv
+			},
 		}
 	}
 }
