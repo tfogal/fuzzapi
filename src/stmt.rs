@@ -146,5 +146,22 @@ mod test {
 		let fqn = Function::new("f", &rv, &vec![]);
 		let fexpr = Expression::FqnCall(fqn);
 		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
+		assert_eq!(fexpr.codegen(), "f()");
+		drop(fexpr);
+
+		// make sure it codegen's single argument...
+		let fvar = variable::Source::free("Fv", &Type::Builtin(Native::I32), null);
+		let arg = Argument::new(&Type::Builtin(Native::I32), fvar);
+		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
+		assert_eq!(fqn.codegen(), "g(Fv)");
+		drop(fqn);
+
+		// .. and that it puts commas if there's an arglist...
+		let va = variable::Source::free("Va", &Type::Builtin(Native::I32), null);
+		let vb = variable::Source::free("Vb", &Type::Builtin(Native::I32), null);
+		let a0 = Argument::new(&Type::Builtin(Native::I32), va);
+		let a1 = Argument::new(&Type::Builtin(Native::I32), vb);
+		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
+		assert_eq!(fqn.codegen(), "h(Va, Vb)");
 	}
 }
