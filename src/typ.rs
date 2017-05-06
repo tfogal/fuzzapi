@@ -15,7 +15,7 @@ impl Native {
 	// it is always safe to assign a narrower-type to the wider-type, and almost
 	// always unsafe to assign the other way.
 	// These do not follow C rules, and are intended to be more restrictive and
-	// force the user to cast.  Notable exceptions:
+	// force the user to cast.  Notable exceptions from C:
 	//   - Usize is assumed to be 32bit, even on 64bit hosts.
 	//   - Integer is assumed to be 32bit
 	//   - Characters are not integer types at all, and thus never "wider".
