@@ -38,6 +38,7 @@ impl Expression {
 	}
 }
 
+// A try that panic()s if it fails instead of returning an error.
 macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
 }
@@ -65,14 +66,14 @@ impl Code for Expression {
 			},
 			&Expression::FqnCall(ref fqn) => {
 				let mut rv = String::new();
-				write!(&mut rv, "{}(", fqn.name);
+				tryp!(write!(&mut rv, "{}(", fqn.name));
 				for (a, arg) in fqn.arguments.iter().enumerate() {
-					write!(&mut rv, "{}", arg.codegen());
+					tryp!(write!(&mut rv, "{}", arg.codegen()));
 					if a != fqn.arguments.len()-1 {
-						write!(&mut rv, ", ");
+						tryp!(write!(&mut rv, ", "));
 					}
 				}
-				write!(&mut rv, ")");
+				tryp!(write!(&mut rv, ")"));
 				rv
 			},
 		}
