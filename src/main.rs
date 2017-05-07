@@ -7,6 +7,7 @@ mod api;
 mod function;
 mod fuzz;
 mod generator;
+mod stmt;
 mod tc;
 mod typ;
 mod usergen;
