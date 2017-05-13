@@ -184,4 +184,23 @@ mod test {
 		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
 		assert_eq!(fqn.codegen(), "h(Va, Vb)");
 	}
+
+	#[test]
+	fn expr_statement() {
+		use std::ops::Deref;
+
+		let null = variable::ScalarOp::Null;
+		let src = variable::Source::free("a", &Type::Builtin(Native::I32), null);
+		let expr = Expression::Simple(null, src.deref().borrow().clone());
+		let sstmt = Statement::Expr(expr);
+		assert_eq!(sstmt.codegen(), "a");
+		drop(sstmt); drop(src);
+
+		let drf = variable::ScalarOp::Deref;
+		let src = variable::Source::free("b", &Type::Builtin(Native::I32), drf);
+		let expr = Expression::Simple(drf, src.deref().borrow().clone());
+		let sstmt = Statement::Expr(expr);
+		assert_eq!(sstmt.codegen(), "*b");
+		drop(sstmt); drop(src);
+	}
 }
