@@ -92,14 +92,7 @@ impl Code for Statement {
 		match self {
 			&Statement::Expr(ref expr) => expr.codegen(),
 			&Statement::Assignment(ref lhs, ref rhs) => {
-				let simple : String = match lhs {
-					&Expression::Simple(ref op, ref src) => {
-						println!("WARNING: should check that 'src' is valid (not fqn etc)");
-						op.to_string() + src.name().as_str()
-					},
-					_ => panic!("lhs must be a scalar expression."),
-				};
-				simple + " = " + rhs.codegen().as_str()
+				lhs.codegen() + " = " + rhs.codegen().as_str() + ";"
 			},
 			&Statement::Verify(_) => unimplemented!(),
 		}
