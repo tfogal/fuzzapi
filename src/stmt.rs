@@ -198,7 +198,7 @@ mod test {
 	}
 
 	#[test]
-	fn assignment_expr() {
+	fn assignment_stmt() {
 		use std::ops::Deref;
 		let null = variable::ScalarOp::Null;
 		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), null);
