@@ -196,4 +196,16 @@ mod test {
 		assert_eq!(sstmt.codegen(), "*b");
 		drop(sstmt); drop(src);
 	}
+
+	#[test]
+	fn assignment_expr() {
+		use std::ops::Deref;
+		let null = variable::ScalarOp::Null;
+		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), null);
+		let src = variable::Source::free("b", &Type::Builtin(Native::I32), null);
+		let srcexp = Expression::Simple(null, src.deref().borrow().clone());
+		let dstexp = Expression::Simple(null, dst.deref().borrow().clone());
+		let sstmt = Statement::Assignment(dstexp, srcexp);
+		assert_eq!(sstmt.codegen(), "a = b;");
+	}
 }
