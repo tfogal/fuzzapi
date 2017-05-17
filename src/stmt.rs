@@ -94,7 +94,9 @@ impl Code for Statement {
 			&Statement::Assignment(ref lhs, ref rhs) => {
 				lhs.codegen() + " = " + rhs.codegen().as_str() + ";"
 			},
-			&Statement::Verify(_) => unimplemented!(),
+			&Statement::Verify(ref expr) => {
+				"assert(".to_string() + expr.codegen().as_str() + ");"
+			},
 		}
 	}
 }
