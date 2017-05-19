@@ -210,4 +210,14 @@ mod test {
 		let sstmt = Statement::Assignment(dstexp, srcexp);
 		assert_eq!(sstmt.codegen(), "a = b;");
 	}
+
+	#[test]
+	fn verify_stmt() {
+		use std::ops::Deref;
+		let null = variable::ScalarOp::Null;
+		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), null);
+		let expr = Expression::Simple(null, vara.deref().borrow().clone());
+		let vstmt = Statement::Verify(expr);
+		assert_eq!(vstmt.codegen(), "assert(a);");
+	}
 }
