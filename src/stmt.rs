@@ -62,7 +62,8 @@ impl Code for Expression {
 				rv
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
-				lhs.codegen() + op.to_string().as_str() + rhs.codegen().as_str()
+				lhs.codegen() + " " + op.to_string().as_str() + " " +
+				rhs.codegen().as_str()
 			},
 			&Expression::FqnCall(ref fqn) => {
 				let mut rv = String::new();
@@ -146,11 +147,13 @@ mod test {
 		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), null);
 		let el = Box::new(Expression::Simple(null, l.deref().borrow().clone()));
 		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
-		compoundtest!(el, Opcode::Add, er, "LHS+RHS");
-		compoundtest!(el, Opcode::Sub, er, "LHS-RHS");
-		compoundtest!(el, Opcode::Mul, er, "LHS*RHS");
-		compoundtest!(el, Opcode::Div, er, "LHS/RHS");
-		compoundtest!(el, Opcode::Mod, er, "LHS%RHS");
+		compoundtest!(el, Opcode::Add, er, "LHS + RHS");
+		compoundtest!(el, Opcode::Sub, er, "LHS - RHS");
+		compoundtest!(el, Opcode::Mul, er, "LHS * RHS");
+		compoundtest!(el, Opcode::Div, er, "LHS / RHS");
+		compoundtest!(el, Opcode::Mod, er, "LHS % RHS");
+		compoundtest!(el, Opcode::LAnd, er, "LHS && RHS");
+		compoundtest!(el, Opcode::LOr, er, "LHS || RHS");
 	}
 
 	#[test]
