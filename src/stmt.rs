@@ -56,6 +56,7 @@ impl Code for Expression {
 					tryp!(write!(rv, "{}{}", op.to_string(), src.root().name()));
 				} else if src.is_retval() {
 					tryp!(write!(rv, "/*fixme, from ret!*/"));
+					unreachable!(); // right?
 				} else {
 					unreachable!();
 				}
