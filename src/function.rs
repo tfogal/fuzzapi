@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use stmt;
 use typ::*;
 use variable::Source;
 
@@ -7,10 +8,21 @@ use variable::Source;
 pub struct Argument {
 	pub ty: Type,
 	pub src: Rc<RefCell<Source>>,
+	pub expr: stmt::Expression,
 }
 impl Argument {
 	pub fn new(t: &Type, s: Rc<RefCell<Source>>) -> Self {
-		Argument{ty: t.clone(), src: s}
+		use variable;
+		use std::ops::Deref;
+		let exp = stmt::Expression::Simple(variable::ScalarOp::Null,
+		                                   s.borrow().deref().clone());
+		Argument{ty: t.clone(), src: s, expr: exp}
+	}
+	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
+		use variable;
+		let nl = variable::ScalarOp::Null;
+		let fake = variable::Source::free("blah", &Type::Builtin(Native::U8), nl);
+		Argument{ty: t.clone(), src: fake, expr: expression.clone()}
 	}
 	pub fn source(&self) -> Source {
 		return self.src.borrow().clone()
