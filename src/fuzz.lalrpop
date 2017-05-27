@@ -78,10 +78,9 @@ LConstant: ::typ::EnumValue = {
 };
 
 LFreeVar: api::FreeVarDecl = {
-	"var" ":" "free" <id: LIdentifier> <oper: LOperation> "gen" ":"
+	"var" ":" "free" <id: LIdentifier> "gen" ":"
 		<gen: LIdentifier> <typename: LTypeName> => {
-		api::FreeVarDecl{name: id, op: oper, genname: gen,
-		                 ty: typename}
+		api::FreeVarDecl{name: id, genname: gen, ty: typename}
 	}
 };
 

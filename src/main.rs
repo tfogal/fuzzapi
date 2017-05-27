@@ -377,8 +377,7 @@ fn main() {
 	let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 	let hcreate_args = vec![fa1, fa2];
 
-	let hc_retval = variable::Source::retval("crterr", "hcreate_r",
-	                                         ScalarOp::Null);
+	let hc_retval = variable::Source::retval("crterr", "hcreate_r");
 	let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
 	let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
@@ -397,7 +396,7 @@ fn main() {
 		Argument::newexpr(&entryp, &rvexpr),
 		Argument::newexpr(&hs_data_ptr, &hsd_addr),
 	];
-	let hs_rv = variable::Source::retval("hserr", "hsearch_r", ScalarOp::Null);
+	let hs_rv = variable::Source::retval("hserr", "hsearch_r");
 	let mut hsearch = Function::new("hsearch_r",
 		&ReturnType::new(&Type::Builtin(Native::Integer),	hs_rv),
 		&hsearch_r_args
@@ -491,8 +490,7 @@ mod test {
 		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
-		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
-																						 ScalarOp::Null);
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r");
 		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
 		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
@@ -523,8 +521,7 @@ mod test {
 		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
-		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
-																						 ScalarOp::Null);
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r");
 		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
 		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
@@ -560,8 +557,7 @@ mod test {
 		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
-		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
-																						 ScalarOp::Null);
+		let hc_retval = variable::Source::retval("crterr", "hcreate_r");
 		let hcr_rt = ReturnType::new(&Type::Builtin(Native::Integer), hc_retval);
 		let mut hcreate = Function::new("hcreate_r", &hcr_rt, &hcreate_args);
 
@@ -575,7 +571,7 @@ mod test {
 	#[test]
 	fn parse_hash_decls() {
 		let s = "struct hsearch_data {}\n".to_string() +
-			"var:free tbl op:addressof gen:opaque udt:hsearch_data\n" +
+			"var:free tbl gen:opaque udt:hsearch_data\n" +
 			"function:new hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +

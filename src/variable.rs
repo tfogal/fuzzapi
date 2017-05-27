@@ -16,7 +16,7 @@ pub struct Source {
 	pub generator: Box<Generator>,
 	// todo fixme: Source should not have a ScalarOp attached.  That should be in
 	// Expression or similar.
-	pub op: ScalarOp,
+	//pub op: ScalarOp,
 	pub parent: Option<Rc<RefCell<Source>>>,
 	pub ty: Type,
 	fqn: String,
@@ -25,7 +25,7 @@ pub struct Source {
 impl Clone for Source {
 	fn clone(&self) -> Self {
 		Source{name: self.name.clone(), generator: self.generator.clone(),
-		       op: self.op, parent: self.parent.clone(), ty: self.ty.clone(),
+		       parent: self.parent.clone(), ty: self.ty.clone(),
 		       fqn: self.fqn.clone()}
 	}
 
@@ -51,27 +51,8 @@ impl Source {
 		};
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: g,
-			op: ScalarOp::Null, /* fixme get rid of this */
 			parent: None,
 			ty: typ.clone(), fqn: "".to_string(),
-		}))
-	}
-
-	// Construct a free variable that uses the generator named 'gen' obtained via
-	// lookup in 'list'.
-	pub fn free_gen(nm: &str, gen: &str, list: &Vec<Box<Generator>>,
-	                o: ScalarOp) -> Rc<RefCell<Source>> {
-		let g: Box<Generator> = match generator_list(gen, &list) {
-			None => panic!("No generator named '{}'.  Known generators: {:?}", gen,
-			               gennames(&list)),
-			Some(x) => x,
-		};
-		println!("WARNING: using broken type.");
-		Rc::new(RefCell::new(Source{
-			name: nm.to_string(), generator: g, op: o,
-			parent: None,
-			ty: Type::Builtin(Native::U16), /* FIXME, broken! */
-			fqn: "".to_string(),
 		}))
 	}
 
@@ -81,11 +62,10 @@ impl Source {
 		return self.name.len() != 0 && self.fqn.len() == 0;
 	}
 
-	pub fn bound(parent: Rc<RefCell<Source>>, o: ScalarOp) ->
-		Rc<RefCell<Source>> {
+	pub fn bound(parent: Rc<RefCell<Source>>) -> Rc<RefCell<Source>> {
 		let typesave =  { parent.borrow().ty.clone() };
 		Rc::new(RefCell::new(Source{
-			name: "".to_string(), generator: Box::new(GenNothing{}), op: o,
+			name: "".to_string(), generator: Box::new(GenNothing{}),
 			parent: Some(parent),
 			ty: typesave,
 			fqn: "".to_string(),
@@ -95,10 +75,10 @@ impl Source {
 		return self.parent.is_some();
 	}
 
-	pub fn retval(name: &str, fqn: &str, oper: ScalarOp) -> Rc<RefCell<Source>> {
+	pub fn retval(name: &str, fqn: &str) -> Rc<RefCell<Source>> {
 		println!("WARNING: using broken retval type");
 		Rc::new(RefCell::new(Source{
-			name: name.to_string(), generator: Box::new(GenNothing{}), op: oper,
+			name: name.to_string(), generator: Box::new(GenNothing{}),
 			parent: None,
 			ty: Type::Builtin(Native::U8), /* FIXME broken */
 			fqn: fqn.to_string(),
@@ -129,14 +109,6 @@ impl Name for Source {
 		println!("invalid source: {:?}", self);
 		unreachable!();
 	}
-}
-
-fn gennames(gens: &Vec<Box<Generator>>) -> Vec<String> {
-	let mut rv: Vec<String> = Vec::new();
-	for g in gens {
-		rv.push(g.name());
-	}
-	rv
 }
 
 // A variable has a root type, but when used in functions it may need to be
@@ -701,7 +673,7 @@ impl Generator for GenCString {
 
 #[cfg(test)]
 mod test {
-	use variable::{Generator, GenNothing, ScalarOp, Source};
+	use variable::{Generator, GenNothing, Source};
 	use typ::{Native, Type};
 
 	#[test]
@@ -711,7 +683,7 @@ mod test {
 		let it = Source::free("item", &intg, "", &generators);
 		let cpy = it.clone();
 		use std::ops::Deref;
-		assert_eq!(cpy.borrow().deref().op, it.borrow().deref().op);
+		assert_eq!(cpy.borrow().deref().name, it.borrow().deref().name);
 	}
 
 	#[test]
@@ -719,7 +691,7 @@ mod test {
 		let intg = Type::Builtin(Native::Integer);
 		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let orig = Source::free("item", &intg, "", &generators);
-		let par = Source::bound(orig, ScalarOp::AddressOf);
+		let par = Source::bound(orig);
 		match par.borrow().parent {
 			None => panic!("no parent?"), _ => {},
 		};
@@ -735,7 +707,7 @@ mod test {
 		let intg = Type::Builtin(Native::Usize);
 		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let orig = Source::free("item", &intg, "", &generators);
-		let par = Source::bound(orig, ScalarOp::AddressOf);
+		let par = Source::bound(orig);
 		let par2: Source = par.borrow().clone();
 		assert!(par.borrow().is_bound());
 		assert!(par2.is_bound());

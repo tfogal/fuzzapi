@@ -42,7 +42,6 @@ pub struct UDTDecl {
 #[derive(Debug)]
 pub struct FreeVarDecl {
 	pub name: String,
-	pub op: variable::ScalarOp,
 	pub genname: String,
 	pub ty: DeclType, // Struct(...) and Enum(...) are not valid, but *Refs are.
 }
@@ -128,11 +127,10 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 
 fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
                   gen: &Vec<Box<variable::Generator>>) -> function::Function {
-	let nullop = variable::ScalarOp::Null;
+	let rtype = type_from_decl(&fqn.retval, &types);
 	let fauxsrc : Rc<RefCell<variable::Source>> =
-		variable::Source::free_gen("???", "std:nothing", &gen, nullop);
-	let retv = function::ReturnType::new(&type_from_decl(&fqn.retval, &types),
-	                                     fauxsrc);
+		variable::Source::free("???", &rtype, "std:nothing", &gen);
+	let retv = function::ReturnType::new(&rtype, fauxsrc);
 	let mut rv = function::Function{
 		name: fqn.name.clone(),
 		arguments: Vec::new(),
@@ -141,7 +139,7 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 	for arg in fqn.arguments.iter() {
 		let typedecl: Type = type_from_decl(&arg, &types);
 		let src: Rc<RefCell<variable::Source>> =
-			variable::Source::free_gen("???", "std:nothing", &gen, nullop);
+			variable::Source::free("???", &typedecl, "std:nothing", &gen);
 		rv.arguments.push(function::Argument::new(&typedecl, src));
 	}
 	return rv;
@@ -164,8 +162,9 @@ pub fn resolve_types(decls: &Vec<Declaration>,
 				} else {
 					fr.genname.clone()
 				};
-				let fvar = variable::Source::free_gen(&fr.name, &gname, generators,
-				                                      fr.op);
+				let typedecl: Type = type_from_decl(&fr.ty, &drv);
+				let fvar = variable::Source::free(&fr.name, &typedecl, &gname,
+				                                  generators);
 				vars.push(fvar);
 			},
 			&Declaration::Function(ref fqn) => {
@@ -337,7 +336,7 @@ mod test {
 
 	#[test]
 	fn struct_fvar_single() {
-		let s = "struct X { } var:free blah op:null gen:I32 i32";
+		let s = "struct X { } var:free blah gen:I32 i32";
 		let decls = match fuzz::parse_L_API(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
@@ -429,7 +428,7 @@ mod test {
 			"pointer char key;\n" +
 			"pointer void value;\n" +
 		"}\n" +
-		"var:free tbl op:addressof gen:opaque udt:Entry";
+		"var:free tbl gen:opaque udt:Entry";
 		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
@@ -444,7 +443,7 @@ mod test {
 	#[test]
 	fn opaque_struct_in_function() {
 		let s = "struct hsearch_data {}\n".to_string() +
-		"var:free tbl op:addressof gen:opaque udt:hsearch_data\n" +
+		"var:free tbl gen:opaque udt:hsearch_data\n" +
 		"function:new hcreate_r int {" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n";
