@@ -7,7 +7,6 @@ use variable::Source;
 #[derive(Clone, Debug)]
 pub struct Argument {
 	pub ty: Type,
-	pub src: Rc<RefCell<Source>>,
 	pub expr: stmt::Expression,
 }
 impl Argument {
@@ -16,20 +15,45 @@ impl Argument {
 		use std::ops::Deref;
 		let exp = stmt::Expression::Simple(variable::ScalarOp::Null,
 		                                   s.borrow().deref().clone());
-		Argument{ty: t.clone(), src: s, expr: exp}
+		Argument{ty: t.clone(), expr: exp}
 	}
 	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
-		use variable;
-		let nl = variable::ScalarOp::Null;
-		let fake = variable::Source::free("blah", &Type::Builtin(Native::U8), nl);
-		Argument{ty: t.clone(), src: fake, expr: expression.clone()}
+		Argument{ty: t.clone(), expr: expression.clone()}
 	}
 	pub fn source(&self) -> Source {
-		return self.src.borrow().clone()
+		match self.expr {
+			stmt::Expression::Simple(_, ref s) => s.clone(),
+			_ => unimplemented!(),
+		}
 	}
 
+	pub fn done(&self) -> bool {
+		match self.expr {
+			stmt::Expression::Simple(_, ref s) => s.generator.done(),
+			_ => unimplemented!(),
+		}
+	}
+	pub fn reset(&mut self) {
+		use std::ops::DerefMut;
+		match self.expr {
+			stmt::Expression::Simple(_, ref mut s) => s.generator.deref_mut().reset(),
+			_ => unimplemented!(),
+		}
+	}
+	pub fn next(&mut self) {
+		use std::ops::DerefMut;
+		match self.expr {
+			stmt::Expression::Simple(_, ref mut s) => s.generator.deref_mut().next(),
+			_ => unimplemented!(),
+		}
+	}
+
+	pub fn decl(&self) -> String {
+		self.expr.decl()
+	}
 	pub fn codegen(&self) -> String {
-		self.src.borrow().name()
+		use stmt::Code;
+		self.expr.codegen()
 	}
 }
 

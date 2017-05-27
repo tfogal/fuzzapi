@@ -40,13 +40,20 @@ impl Clone for Source {
 // transparent to the user; we should somehow hide this aspect of the data
 // structure, potentially by using a higher-level data structure.
 impl Source {
-	// Construct a free variable of the given type that needs the given ScalarOp.
-	pub fn free(nm: &str, ty: &Type, o: ScalarOp) -> Rc<RefCell<Source>> {
+	// Construct a free variable of the given type, using the given generator.
+	// The generator can be the null string to search for a default one.
+	pub fn free(nm: &str, typ: &Type, gen: &str, list: &Vec<Box<Generator>>) ->
+		Rc<RefCell<Source>> {
+		let g: Box<Generator> = match generator_list(gen, &list) {
+			Some(x) => x,
+			// if we can't find an appropriate generator, try to auto-create one.
+			None => generator(typ),
+		};
 		Rc::new(RefCell::new(Source{
-			name: nm.to_string(), generator: generator(ty), op: o,
+			name: nm.to_string(), generator: g,
+			op: ScalarOp::Null, /* fixme get rid of this */
 			parent: None,
-			ty: ty.clone(),
-			fqn: "".to_string(),
+			ty: typ.clone(), fqn: "".to_string(),
 		}))
 	}
 
@@ -63,7 +70,7 @@ impl Source {
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: g, op: o,
 			parent: None,
-			ty: Type::Builtin(Native::U8), /* FIXME, broken! */
+			ty: Type::Builtin(Native::U16), /* FIXME, broken! */
 			fqn: "".to_string(),
 		}))
 	}
@@ -694,13 +701,14 @@ impl Generator for GenCString {
 
 #[cfg(test)]
 mod test {
-	use variable::{ScalarOp, Source};
+	use variable::{Generator, GenNothing, ScalarOp, Source};
 	use typ::{Native, Type};
 
 	#[test]
 	fn test_src_clone() {
 		let intg = Type::Builtin(Native::Integer);
-		let it = Source::free("item", &intg, ScalarOp::Null);
+		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let it = Source::free("item", &intg, "", &generators);
 		let cpy = it.clone();
 		use std::ops::Deref;
 		assert_eq!(cpy.borrow().deref().op, it.borrow().deref().op);
@@ -709,7 +717,8 @@ mod test {
 	#[test]
 	fn test_src_clone_multiple() {
 		let intg = Type::Builtin(Native::Integer);
-		let orig = Source::free("item", &intg, ScalarOp::Null);
+		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let orig = Source::free("item", &intg, "", &generators);
 		let par = Source::bound(orig, ScalarOp::AddressOf);
 		match par.borrow().parent {
 			None => panic!("no parent?"), _ => {},
@@ -724,7 +733,8 @@ mod test {
 	#[test]
 	fn test_src_parent() {
 		let intg = Type::Builtin(Native::Usize);
-		let orig = Source::free("item", &intg, ScalarOp::Null);
+		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let orig = Source::free("item", &intg, "", &generators);
 		let par = Source::bound(orig, ScalarOp::AddressOf);
 		let par2: Source = par.borrow().clone();
 		assert!(par.borrow().is_bound());

@@ -4,7 +4,7 @@ use usergen::Opcode;
 use variable;
 
 // Code is anything we can generate code for.
-trait Code {
+pub trait Code {
 	fn codegen(&self) -> String;
 }
 
@@ -82,11 +82,32 @@ impl Code for Expression {
 	}
 }
 
+impl Expression {
+	// This creates variable declarations for everything that goes into this
+	// expression.  Functions are ignored.
+	pub fn decl(&self) -> String {
+		use std::fmt::Write;
+		let mut rv: String = String::new();
+		match self {
+			&Expression::Simple(_, ref src) => {
+				let nm = src.name();
+				write!(&mut rv, "{} {} = {};", src.ty.name(), nm,
+				       src.generator.value()).unwrap();
+			},
+			&Expression::Compound(ref lhs, _, ref rhs) => {
+				write!(&mut rv, "{}\n{}\n", lhs.decl(), rhs.decl()).unwrap();
+			},
+			&Expression::FqnCall(_) => {},
+		}
+		rv
+	}
+}
+
 pub enum Statement {
 	Expr(Expression),
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
-	/* should have 'if' and 'loop' etc. */
+	/* todo: 'if' and 'loop' etc. */
 }
 
 impl Code for Statement {
@@ -106,12 +127,14 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use variable::*;
 
 	#[test]
 	fn simple_expr() {
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let null = variable::ScalarOp::Null;
 		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
-		                                 null);
+		                                 "", &g);
 		use std::ops::Deref;
 		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
@@ -120,7 +143,7 @@ mod test {
 
 		// make sure address of affects codegen.
 		let addrof = variable::ScalarOp::AddressOf;
-		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), null);
+		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), "",&g);
 		let expr = Expression::Simple(addrof, v2.deref().borrow().clone());
 		assert_eq!(expr.codegen(), "&var2");
 		drop(expr);
@@ -128,7 +151,7 @@ mod test {
 		// make sure deref affects codegen.
 		let addrof = variable::ScalarOp::Deref;
 		let ptr = Type::Pointer(Box::new(Type::Builtin(Native::I32)));
-		let v3 = variable::Source::free("var3", &ptr, null);
+		let v3 = variable::Source::free("var3", &ptr, "", &g);
 		let expr = Expression::Simple(addrof, v3.deref().borrow().clone());
 		assert_eq!(expr.codegen(), "*var3");
 	}
@@ -143,9 +166,10 @@ mod test {
 	#[test]
 	fn compound_expr() {
 		use std::ops::Deref;
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), "", &g);
+		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), null);
-		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), null);
 		let el = Box::new(Expression::Simple(null, l.deref().borrow().clone()));
 		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
 		compoundtest!(el, Opcode::Add, er, "LHS + RHS");
@@ -159,8 +183,8 @@ mod test {
 
 	#[test]
 	fn fqn_expr() {
-		let null = variable::ScalarOp::Null;
-		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), null);
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), "", &g);
 		let rv = ReturnType::new(&Type::Builtin(Native::I32), r);
 		let fqn = Function::new("f", &rv, &vec![]);
 		let fexpr = Expression::FqnCall(fqn);
@@ -169,15 +193,15 @@ mod test {
 		drop(fexpr);
 
 		// make sure it codegen's single argument...
-		let fvar = variable::Source::free("Fv", &Type::Builtin(Native::I32), null);
+		let fvar = variable::Source::free("Fv", &Type::Builtin(Native::I32), "",&g);
 		let arg = Argument::new(&Type::Builtin(Native::I32), fvar);
 		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
 		assert_eq!(fqn.codegen(), "g(Fv)");
 		drop(fqn);
 
 		// .. and that it puts commas if there's an arglist...
-		let va = variable::Source::free("Va", &Type::Builtin(Native::I32), null);
-		let vb = variable::Source::free("Vb", &Type::Builtin(Native::I32), null);
+		let va = variable::Source::free("Va", &Type::Builtin(Native::I32), "", &g);
+		let vb = variable::Source::free("Vb", &Type::Builtin(Native::I32), "", &g);
 		let a0 = Argument::new(&Type::Builtin(Native::I32), va);
 		let a1 = Argument::new(&Type::Builtin(Native::I32), vb);
 		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
@@ -187,16 +211,17 @@ mod test {
 	#[test]
 	fn expr_statement() {
 		use std::ops::Deref;
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 
 		let null = variable::ScalarOp::Null;
-		let src = variable::Source::free("a", &Type::Builtin(Native::I32), null);
+		let src = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
 		assert_eq!(sstmt.codegen(), "a");
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
-		let src = variable::Source::free("b", &Type::Builtin(Native::I32), drf);
+		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(drf, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
 		assert_eq!(sstmt.codegen(), "*b");
@@ -206,9 +231,10 @@ mod test {
 	#[test]
 	fn assignment_stmt() {
 		use std::ops::Deref;
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
+		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), null);
-		let src = variable::Source::free("b", &Type::Builtin(Native::I32), null);
 		let srcexp = Expression::Simple(null, src.deref().borrow().clone());
 		let dstexp = Expression::Simple(null, dst.deref().borrow().clone());
 		let sstmt = Statement::Assignment(dstexp, srcexp);
@@ -218,10 +244,23 @@ mod test {
 	#[test]
 	fn verify_stmt() {
 		use std::ops::Deref;
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), null);
 		let expr = Expression::Simple(null, vara.deref().borrow().clone());
 		let vstmt = Statement::Verify(expr);
 		assert_eq!(vstmt.codegen(), "assert(a);");
+	}
+
+	#[test]
+	fn decl_simple() {
+		use std::ops::Deref;
+		let null = variable::ScalarOp::Null;
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
+		let expr = Expression::Simple(null, vara.deref().borrow().clone());
+		/* The value here is very dependent on the initial state of the default
+		 * generator for I32... */
+		assert_eq!(expr.decl(), "int32_t a = -2147483648;");
 	}
 }

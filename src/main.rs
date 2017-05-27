@@ -1,4 +1,5 @@
 extern crate rand;
+use std::collections::HashSet;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
@@ -14,6 +15,7 @@ mod usergen;
 mod util;
 mod variable;
 use function::*;
+use stmt::*;
 use typ::*;
 use usergen::UserGen;
 
@@ -31,31 +33,11 @@ fn header(strm: &mut std::io::Write, hdrs: &Vec<&str>) -> std::io::Result<()>
 	return Ok(());
 }
 
-// Prints out the variable name as it would be used in an r-value context.
-// Notably this includes any scalar operations that need to be applied in the
-// given context.
-fn rvalue(src: &variable::Source) -> String {
-	use std::fmt::Write;
-	let mut rv = String::new();
-
-	if src.is_free() {
-		tryp!(write!(rv, "{}{}", src.op.to_string(), src.name()));
-	} else if src.is_bound() {
-		/* should we prepend scalar op? */
-		use std::ops::Deref;
-		let dad = src.parent.clone().unwrap(); // appease borrow checker.
-		return rvalue(dad.borrow().deref());
-	} else if src.is_retval() {
-		tryp!(write!(rv, "/*fixme, from ret*/"));
-	}
-	return rv;
-}
-
 fn reset(fqn: &mut Function) {
-	use std::ops::DerefMut;
-	for arg in fqn.arguments.iter() {
-		if arg.source().is_free() {
-			arg.src.borrow_mut().generator.deref_mut().reset();
+	for i in 0..fqn.arguments.len() {
+		if fqn.arguments[i].source().is_free() {
+			//arg.src.borrow_mut().generator.deref_mut().reset();
+			fqn.arguments[i].reset();
 		}
 	}
 }
@@ -66,7 +48,7 @@ fn reset(fqn: &mut Function) {
 // all arguments are done.
 fn fqnfinished(func: &Function) -> bool {
 	return func.arguments.iter().all(
-		|ref arg| arg.source().generator.done()
+		|ref arg| arg.done()
 	);
 }
 
@@ -81,7 +63,7 @@ fn fqnnext(func: &mut Function) {
 	assert!(!fqnfinished(func));
 	// Find the "rightmost" (last) argument that is incomplete.
 	let nxt = match func.arguments.iter().rposition(|ref a| {
-		!a.source().generator.done()
+		!a.done()
 	}) {
 		None => { // this implies the function is finished.  Bug somewhere.
 			panic!("Bug: function {} not finished, but can't find non-done arg?",
@@ -89,13 +71,13 @@ fn fqnnext(func: &mut Function) {
 		},
 		Some(idx) => idx,
 	};
-	assert!(!func.arguments[nxt].source().generator.done());
+	assert!(!func.arguments[nxt].done());
 	// Iterate that "rightmost unfinished" argument.
-	func.arguments[nxt].src.borrow_mut().generator.next();
+	func.arguments[nxt].next();
 
 	// reset all subsequent arguments.
 	for idx in nxt+1..func.arguments.len() {
-		func.arguments[idx].src.borrow_mut().generator.reset();
+		func.arguments[idx].reset()
 	}
 }
 
@@ -151,13 +133,13 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	// given in the order they should be called...
 	try!(writeln!(strm, "int main() {{"));
 
+	let mut seen: HashSet<String> = HashSet::new(); // don't declare vars twice.
 	for fqn in fqns {
 		// declare all variables used as arguments to the function
 		for ref arg in fqn.arguments.iter() {
-			if arg.source().is_free() {
-				let nm: String = arg.source().name();
-				try!(writeln!(strm, "\t{} {} = {};", arg.ty.name(), nm,
-				              arg.src.borrow_mut().generator.value()));
+			if arg.source().is_free() && !seen.contains(&arg.decl()) {
+				try!(writeln!(strm, "\t{}", arg.decl()));
+				seen.insert(arg.decl());
 			} // no else: all vars eventually come from a free
 		};
 		let ref ret = fqn.retval;
@@ -172,7 +154,7 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 
 		for (a, ref arg) in fqn.arguments.iter().enumerate() {
 			//let &(_, ref src) = *arg;
-			try!(write!(strm, "{}", rvalue(&arg.source())));
+			try!(write!(strm, "{}", arg.codegen()));
 			if a < fqn.arguments.len()-1 {
 				try!(write!(strm, ", "));
 			}
@@ -385,13 +367,14 @@ fn main() {
 	let action = Type::Enum("ACTION".to_string(), action_values);
 
 	use variable::ScalarOp;
-	let nel = variable::Source::free_gen("nel", "std:usize", &generators,
-	                                     ScalarOp::Null);
+	let nel = variable::Source::free("nel", &Type::Builtin(Native::Usize),
+	                                 "std:usize", &generators);
 	let genname = "std:opaque:struct hsearch_data*";
-	let hsd_var = variable::Source::free_gen("tbl", genname,
-	                                         &generators, ScalarOp::AddressOf);
+	let hsd_var = variable::Source::free("tbl", &hs_data, genname, &generators);
+	let hsd_addr = Expression::Simple(ScalarOp::AddressOf,
+	                                  hsd_var.borrow().clone());
 	let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
-	let fa2 = Argument::new(&hs_data, hsd_var.clone());
+	let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 	let hcreate_args = vec![fa1, fa2];
 
 	let hc_retval = variable::Source::retval("crterr", "hcreate_r",
@@ -401,17 +384,18 @@ fn main() {
 
 //       int hsearch_r(ENTRY item, ACTION action, ENTRY **retval,
 //                     struct hsearch_data *htab);
-	let item = variable::Source::free("item", &entry.clone(), ScalarOp::Null);
-	let actvar = variable::Source::free_gen("action", "std:enum:ACTION",
-	                                        &generators, ScalarOp::Null);
+
+	let item = variable::Source::free("item", &entry.clone(), "", &generators);
+	let actvar = variable::Source::free("action", &action, "std:enum:ACTION",
+	                                    &generators);
 	let entryp = Type::Pointer(Box::new(entry.clone()));
-	let rv = variable::Source::free("retval", &entryp, ScalarOp::AddressOf);
-	let htab = variable::Source::bound(hsd_var.clone(), ScalarOp::AddressOf);
+	let rv = variable::Source::free("retval", &entryp, "", &generators);
+	let rvexpr = Expression::Simple(ScalarOp::AddressOf, rv.borrow().clone());
 	let hsearch_r_args = vec![
 		Argument::new(&entry, item),
 		Argument::new(&action, actvar),
-		Argument::new(&entryp, rv),
-		Argument::new(&hs_data_ptr, htab),
+		Argument::newexpr(&entryp, &rvexpr),
+		Argument::newexpr(&hs_data_ptr, &hsd_addr),
 	];
 	let hs_rv = variable::Source::retval("hserr", "hsearch_r", ScalarOp::Null);
 	let mut hsearch = Function::new("hsearch_r",
@@ -444,7 +428,7 @@ fn main() {
 		};
 		next(&mut functions);
 	}
-	// We next()ed, but then our iteration is finished() before we actually
+	// We next()ed, but then our iteration finished() before we actually
 	// compile_and_test()ed the resultant state.  Test that last state.
 	match compile_and_test(&mut functions) {
 		Err(e) => panic!("compile/test error: {}", e),
@@ -496,13 +480,15 @@ mod test {
 		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 
 		use variable::ScalarOp;
-		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
-																				 ScalarOp::Null);
+		let nel = variable::Source::free("nel", &Type::Builtin(Native::Usize),
+		                                 "std:usize", &generators);
 		let genname = "std:opaque:struct hsearch_data*";
-		let hsd_var = variable::Source::free_gen("tbl", genname,
-																						 &generators, ScalarOp::AddressOf);
+		let hsd_var = variable::Source::free("tbl", &hs_data, genname,
+		                                     &generators);
+		let hsd_addr = Expression::Simple(ScalarOp::AddressOf,
+		                                  hsd_var.borrow().clone());
 		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
-		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
 		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
@@ -526,13 +512,15 @@ mod test {
 		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 
 		use variable::ScalarOp;
-		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
-																				 ScalarOp::Null);
+		let nel = variable::Source::free("nel", &Type::Builtin(Native::Usize),
+		                                 "std:usize", &generators);
 		let genname = "std:opaque:struct hsearch_data*";
-		let hsd_var = variable::Source::free_gen("tbl", genname,
-																						 &generators, ScalarOp::AddressOf);
+		let hsd_var = variable::Source::free("tbl", &hs_data, genname, &generators);
+		let hsd_addr = Expression::Simple(ScalarOp::AddressOf,
+		                                  hsd_var.borrow().clone());
+
 		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
-		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
 		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
@@ -561,13 +549,15 @@ mod test {
 		let hs_data = Type::Struct("struct hsearch_data".to_string(), vec![]);
 
 		use variable::ScalarOp;
-		let nel = variable::Source::free_gen("nel", "std:usize", &generators,
-																				 ScalarOp::Null);
+		let nel = variable::Source::free("nel", &Type::Builtin(Native::Usize),
+		                                 "std:usize", &generators);
 		let genname = "std:opaque:struct hsearch_data*";
-		let hsd_var = variable::Source::free_gen("tbl", genname,
-																						 &generators, ScalarOp::AddressOf);
+		let hsd_var = variable::Source::free("tbl", &hs_data, genname,
+		                                     &generators);
+		let hsd_addr = Expression::Simple(ScalarOp::AddressOf,
+		                                  hsd_var.borrow().clone());
 		let fa1 = Argument::new(&Type::Builtin(Native::Usize), nel);
-		let fa2 = Argument::new(&hs_data, hsd_var.clone());
+		let fa2 = Argument::newexpr(&hs_data, &hsd_addr);
 		let hcreate_args = vec![fa1, fa2];
 
 		let hc_retval = variable::Source::retval("crterr", "hcreate_r",
