@@ -53,12 +53,11 @@ pub struct UserGen {
 	pub name: String,
 	states: Vec<Expression>,
 	idx: usize,
-	rng: rand::ThreadRng,
 }
 impl UserGen {
 	pub fn new(t: Type, nm: &String, stlist: &Vec<Expression>) -> Self {
 		UserGen{ty: t, name: nm.clone(), states: (*stlist).clone(),
-		        idx: 0, rng: rand::thread_rng()}
+		        idx: 0}
 	}
 
 	fn typed_min(t: &Type) -> String {
@@ -100,7 +99,7 @@ impl UserGen {
 		}
 	}
 
-	fn interp(&mut self, expr: &Expression) -> String {
+	fn interp(&self, expr: &Expression) -> String {
 		match expr {
 			&Expression::ConstExpr(ref c) => c.to_string(),
 			&Expression::Compound(ref left, ref op, ref right) => {
@@ -130,7 +129,7 @@ impl UserGen {
 				let lo = l.parse::<i64>().unwrap();
 				let hi = h.parse::<i64>().unwrap();
 				let range = Range::new(lo, hi);
-				range.ind_sample(&mut self.rng).to_string()
+				range.ind_sample(&mut rand::thread_rng()).to_string()
 			}
 		}
 	}
@@ -203,7 +202,7 @@ impl fmt::Debug for Constant {
 
 impl ::variable::Generator for UserGen {
 	fn name(&self) -> String { self.name.clone() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		let i = self.idx;
 		let expr: Expression = self.states[i].clone();
 		self.interp(&expr)
@@ -228,7 +227,7 @@ impl ::variable::Generator for UserGen {
 	fn clone(&self) -> Box<Generator> {
 		Box::new(UserGen{ty: self.ty.clone(), name: self.name.clone(),
 		                 states: self.states.clone(),
-		                 idx: self.idx, rng: self.rng.clone()})
+		                 idx: self.idx})
 	}
 }
 
@@ -314,7 +313,7 @@ mod test {
 	fn gen_interp_constant() {
 		use variable::Generator;
 		let s = "generator name u8 state u8:min()";
-		let mut ugen = match generator::parse_LGeneratorList(s) {
+		let ugen = match generator::parse_LGeneratorList(s) {
 			Ok(prs) => prs,
 			Err(e) => panic!("parse error: {:?}", e),
 		};

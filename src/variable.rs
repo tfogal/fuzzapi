@@ -158,7 +158,7 @@ pub trait Generator {
 	fn name(&self) -> String;
 
 	// Grabs the current state as an expression.
-	fn value(&mut self) -> String;
+	fn value(&self) -> String;
 	// Moves to the next state.  Does nothing if at the end state.
 	fn next(&mut self);
 	/// At the end state?
@@ -241,7 +241,7 @@ pub struct GenNothing {}
 // functions and have it make sense ...
 impl Generator for GenNothing {
 	fn name(&self) -> String { "std:nothing".to_string() }
-	fn value(&mut self) -> String { panic!("Null generator called"); }
+	fn value(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
 	fn n_state(&self) -> usize { 1 }
@@ -269,7 +269,7 @@ impl Generator for GenOpaque {
 	fn name(&self) -> String {
 		"std:opaque:".to_string() + self.ty.name().as_str()
 	}
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "/*({})*/{{}}", self.ty.name()).unwrap();
@@ -301,7 +301,7 @@ impl GenEnum {
 
 impl Generator for GenEnum {
 	fn name(&self) -> String { self.name.clone() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -341,7 +341,7 @@ impl GenI32 {
 
 impl Generator for GenI32 {
 	fn name(&self) -> String { "std:I32orig".to_string() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
 	fn next(&mut self) {
@@ -380,7 +380,7 @@ impl GenUsize {
 
 impl Generator for GenUsize {
 	fn name(&self) -> String { "std:usize".to_string() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "{}ull", self.cls.value(self.idx).to_string()).unwrap();
@@ -456,7 +456,7 @@ impl GenStruct {
 
 impl Generator for GenStruct {
 	fn name(&self) -> String { "std:Struct".to_string() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		use std::fmt::Write;
 		let mut rv = String::new();
 
@@ -537,7 +537,7 @@ impl GenPointer {
 
 impl Generator for GenPointer {
 	fn name(&self) -> String { "std:pointer".to_string() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		let mut rv = String::new();
 		use std::fmt::Write;
 		write!(&mut rv, "({}){}ull", self.ty.name(),
@@ -597,7 +597,7 @@ impl GenCString {
 	//   No ?: groups of ??anything are lame C trigraphs,
 	//   No ": as it might terminate the string early.
 	//   No \: it could escape the next character, which might be the end, ".
-	fn normal(&mut self) -> char {
+	fn normal(&self) -> char {
 		let mut x: char = self.printable.value(0);
 		let disallowed: [char;3] = ['"', '?', '\\'];
 		while disallowed.iter().any(|y| x == *y) {
@@ -607,7 +607,7 @@ impl GenCString {
 	}
 
 	// Generate a 'special' character that is valid in strings.
-	fn special(&mut self) -> char {
+	fn special(&self) -> char {
 		let mut x: char = self.control.value(0);
 		let disallowed = [7,8,9,10,11,12,13, 27];
 		while disallowed.iter().any(|y| x as u8 == *y) {
@@ -619,7 +619,7 @@ impl GenCString {
 
 impl Generator for GenCString {
 	fn name(&self) -> String { "std:cstring".to_string() }
-	fn value(&mut self) -> String {
+	fn value(&self) -> String {
 		// special case null, so that we can wrap all other cases in "".
 		if self.idx == 0 {
 			return "NULL".to_string();
