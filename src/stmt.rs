@@ -12,6 +12,11 @@ pub trait Code {
 pub enum Expression {
 	Simple(variable::ScalarOp, variable::Source),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
+	// Since they return a value, we say function calls are expressions instead
+	// of statements.  Then any expression, no matter how trivial, is a
+	// Statement. This has the slightly undesirable property that "variable;" is
+	// a representable statement, which is nonsense, but I suppose it mirrors C
+	// so at least it's intuitive.
 	FqnCall(Function),
 }
 
@@ -103,6 +108,7 @@ impl Expression {
 	}
 }
 
+#[derive(Debug)]
 pub enum Statement {
 	Expr(Expression),
 	Assignment(Expression /* LHS */, Expression /* RHS */),

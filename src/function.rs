@@ -58,7 +58,6 @@ impl Argument {
 }
 
 #[derive(Clone, Debug)]
-// Same as an Argument technically...
 pub struct ReturnType {
 	pub ty: Type,
 	pub src: Rc<RefCell<Source>>,

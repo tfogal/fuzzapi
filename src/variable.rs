@@ -16,12 +16,15 @@ pub struct Source {
 	pub generator: Box<Generator>,
 	// todo fixme: Source should not have a ScalarOp attached.  That should be in
 	// Expression or similar.
-	//pub op: ScalarOp,
 	pub parent: Option<Rc<RefCell<Source>>>,
 	pub ty: Type,
 	fqn: String,
 }
 
+// We need a special impl because of the Box for the generator.
+// Duplicating the generator is fine and probably what we want.  If we are
+// cloning a Source, we probably want that to be distinct, and thus we would
+// not want it to share the generator anyway.
 impl Clone for Source {
 	fn clone(&self) -> Self {
 		Source{name: self.name.clone(), generator: self.generator.clone(),

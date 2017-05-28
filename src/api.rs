@@ -8,6 +8,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use function;
+use stmt;
 use typ::{EnumValue, Native, Type};
 use variable;
 
@@ -65,6 +66,12 @@ pub enum Declaration {
 	Free(FreeVarDecl),
 	Function(FuncDecl),
 	UDT(DeclType), // Error if the DeclType is not a Struct || Enum!
+}
+
+#[derive(Debug)]
+pub struct Program {
+	pub declarations: Vec<Declaration>,
+	pub statements: Vec<stmt::Statement>,
 }
 
 // gives the type from the declaration.
@@ -159,6 +166,10 @@ pub fn resolve_types(decls: &Vec<Declaration>,
 			&Declaration::Free(ref fr) => {
 				let gname: String = if fr.genname == "opaque" {
 					"std:opaque:".to_string() + &fr.ty.typename()
+				} else if fr.genname == "udt" || fr.genname == "UDT" {
+					"std:udt:".to_string() + &fr.ty.typename()
+				} else if fr.genname == "enum" || fr.genname == "Enum" {
+					"std:enum:".to_string() + &fr.ty.typename()
 				} else {
 					fr.genname.clone()
 				};
@@ -203,9 +214,9 @@ mod test {
 	#[test]
 	fn empty_struct() {
 		let s = "struct entry { }";
-		assert!(fuzz::parse_L_API(s).is_ok());
-		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
-		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
+		assert!(fuzz::parse_LDeclarations(s).is_ok());
+		assert_eq!(fuzz::parse_LDeclarations(s).unwrap().len(), 1);
+		let ref decl: api::Declaration = fuzz::parse_LDeclarations(s).unwrap()[0];
 		let decl = match decl {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
@@ -221,18 +232,18 @@ mod test {
 				assert_eq!(decllist.len(), 0)
 			},
 		};
-		let mut generators: Vec<Box<variable::Generator>> = Vec::new();
+		let mut gens: Vec<Box<variable::Generator>> = Vec::new();
 		let (decl, _) =
-			api::resolve_types(&fuzz::parse_L_API(s).unwrap(), &mut generators);
+			api::resolve_types(&fuzz::parse_LDeclarations(s).unwrap(), &mut gens);
 		assert_eq!(decl.len(), 1);
 	}
 
 	#[test]
 	fn struct_pointer_char() {
 		let s = "struct Ent { pointer char key; }";
-		assert!(fuzz::parse_L_API(s).is_ok());
-		assert_eq!(fuzz::parse_L_API(s).unwrap().len(), 1);
-		let ref decl: api::Declaration = fuzz::parse_L_API(s).unwrap()[0];
+		assert!(fuzz::parse_LDeclarations(s).is_ok());
+		assert_eq!(fuzz::parse_LDeclarations(s).unwrap().len(), 1);
+		let ref decl: api::Declaration = fuzz::parse_LDeclarations(s).unwrap()[0];
 		let decl = match decl {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
@@ -268,9 +279,10 @@ mod test {
 			"pointer char key;\n" +
 			"pointer void value;\n" +
 		"}";
-		assert!(fuzz::parse_L_API(s.as_str()).is_ok());
-		assert_eq!(fuzz::parse_L_API(s.as_str()).unwrap().len(), 1);
-		let ref decl: api::Declaration = fuzz::parse_L_API(s.as_str()).unwrap()[0];
+		assert!(fuzz::parse_LDeclarations(s.as_str()).is_ok());
+		assert_eq!(fuzz::parse_LDeclarations(s.as_str()).unwrap().len(), 1);
+		let ref decl: api::Declaration =
+			fuzz::parse_LDeclarations(s.as_str()).unwrap()[0];
 		let decl = match decl {
 			&api::Declaration::UDT(ref udt) => udt,
 			_ => panic!("invalid declaration parse {:?}", decl),
@@ -315,19 +327,19 @@ mod test {
 	#[test]
 	fn enum_single() {
 		let s = "enum Enumeration { BLAH = 0 , }";
-		match fuzz::parse_L_API(s) {
+		match fuzz::parse_LDeclarations(s) {
 			Ok(_) => {},
 			Err(e) => panic!("{:?}", e),
 		};
 		let t = "enum Enumeration { BLA = 0 , }";
-		assert!(fuzz::parse_L_API(t).is_ok());
-		assert_eq!(fuzz::parse_L_API(t).unwrap().len(), 1);
+		assert!(fuzz::parse_LDeclarations(t).is_ok());
+		assert_eq!(fuzz::parse_LDeclarations(t).unwrap().len(), 1);
 	}
 
 	#[test]
 	fn enum_multi() {
 		let s = "enum Enumeration { FOO = 0 , BAR = 1 , BAZ = 42 , }";
-		let decls = match fuzz::parse_L_API(s) {
+		let decls = match fuzz::parse_LDeclarations(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -337,7 +349,7 @@ mod test {
 	#[test]
 	fn struct_fvar_single() {
 		let s = "struct X { } var:free blah gen:I32 i32";
-		let decls = match fuzz::parse_L_API(s) {
+		let decls = match fuzz::parse_LDeclarations(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -347,7 +359,7 @@ mod test {
 	#[test]
 	fn parse_function_new() {
 		let s = "function:new hcreate_r int {usize, pointer struct hsearch_data,}";
-		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s) {
+		let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -395,7 +407,8 @@ mod test {
 		"function:new hsearch_r int {" +
 			"int, int, pointer pointer int, pointer struct hsearch_data," +
 		"}";
-		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+		let decls: Vec<api::Declaration> =
+			match fuzz::parse_LDeclarations(s.as_str()) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -428,8 +441,9 @@ mod test {
 			"pointer char key;\n" +
 			"pointer void value;\n" +
 		"}\n" +
-		"var:free tbl gen:opaque udt:Entry";
-		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+		"var:free tbl gen:opaque struct Entry";
+		let decls: Vec<api::Declaration> =
+			match fuzz::parse_LDeclarations(s.as_str()) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -443,11 +457,12 @@ mod test {
 	#[test]
 	fn opaque_struct_in_function() {
 		let s = "struct hsearch_data {}\n".to_string() +
-		"var:free tbl gen:opaque udt:hsearch_data\n" +
+		"var:free tbl gen:opaque struct hsearch_data\n" +
 		"function:new hcreate_r int {" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n";
-		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s.as_str()) {
+		let decls: Vec<api::Declaration> =
+			match fuzz::parse_LDeclarations(s.as_str()) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};
@@ -469,7 +484,7 @@ mod test {
 	#[test]
 	fn enum_resolves_with_generator() {
 		let s = "enum ACTION { ENTER=0, FIND=1, }\n";
-		let decls: Vec<api::Declaration> = match fuzz::parse_L_API(s) {
+		let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
 		};

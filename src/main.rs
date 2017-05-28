@@ -338,7 +338,7 @@ fn parse_types(fname: &str, mut generators: &mut Vec<Box<variable::Generator>>)
 	let mut s = String::new();
 	use std::io::Read;
 	fp.read_to_string(&mut s).unwrap();
-	let decls: Vec<api::Declaration> = match fuzz::parse_L_API(&s) {
+	let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(&s) {
 		Err(e) => panic!("error parsing {}: {:?}", fname, e),
 		Ok(x) => x,
 	};
@@ -571,7 +571,7 @@ mod test {
 	#[test]
 	fn parse_hash_decls() {
 		let s = "struct hsearch_data {}\n".to_string() +
-			"var:free tbl gen:opaque udt:hsearch_data\n" +
+			"var:free tbl gen:opaque struct hsearch_data\n" +
 			"function:new hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +
@@ -593,5 +593,34 @@ mod test {
 			println!("\t{:?}", t);
 		}
 		// todo: should assert properties of those types
+	}
+
+	#[test]
+	fn hs_case() {
+		let s = "struct hsearch_data {}\n".to_string() +
+			"struct entry { pointer char key; pointer void data; }\n" +
+			"enum ACTION { FIND = 0 , ENTER = 1 , }" +
+			"var:free nel gen:Usize usize\n" +
+			"var:free tbl gen:opaque struct hsearch_data\n" +
+			/* no current way to represent hcreate_r return value .. */
+			"var:free item gen:udt struct entry\n" +
+			"var:free actvar gen:Enum enum ACTION\n" +
+			// note the API has a fqn argument named "retval"!
+			"var:free retval gen:udt pointer struct entry\n" +
+			/* no current way to represent hsearch_r's retval ... */
+			"function:new hcreate_r int {\n" +
+				"usize, pointer struct hsearch_data,\n" +
+			"}\n" +
+			"function:new hsearch_r int {\n" +
+				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
+			"}\n" +
+			"function:call hcreate_r { nel op:& tbl }\n" +
+			"function:call hsearch_r { item actvar op:& retval op:& tbl }\n";
+		let lprogram = match fuzz::parse_LProgram(s.as_str()) {
+			Err(e) => panic!("{:?}", e),
+			Ok(x) => x,
+		};
+		assert!(lprogram.declarations.len() > 1);
+		assert_eq!(lprogram.statements.len(), 2);
 	}
 }

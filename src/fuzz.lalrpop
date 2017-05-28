@@ -1,11 +1,18 @@
 // Parsing grammar/code for the user's program abstraction.
 use api;
 use typ::{Native, Type};
+use stmt;
 use variable;
 
 grammar;
 
-pub L_API : Vec<api::Declaration> = {
+pub LProgram : api::Program = {
+	<decls: LDeclarations> <stmts: LStmt*> => {
+		api::Program{declarations: decls, statements: stmts}
+	},
+};
+
+pub LDeclarations : Vec<api::Declaration> = {
 	<decllist: LUDTDecl*> <fvarlist: LFreeVar*> <funclist: LFunc*> => {
 		// todo fixme: this should be more than a list of declarations,
 		// abstract code should follow
@@ -78,16 +85,10 @@ LConstant: ::typ::EnumValue = {
 };
 
 LFreeVar: api::FreeVarDecl = {
-	"var" ":" "free" <id: LIdentifier> "gen" ":"
-		<gen: LIdentifier> <typename: LTypeName> => {
+	"var" ":" "free" <id: LIdentifier> "gen" ":" <gen: LIdentifier>
+	<typename: LTypeRef> => {
 		api::FreeVarDecl{name: id, genname: gen, ty: typename}
 	}
-};
-
-LTypeName: api::DeclType = {
-	<ty: LSimpleType> => api::DeclType::Basic(Type::Builtin(ty)),
-	"udt" ":" <sref: LIdentifier> => api::DeclType::StructRef(sref),
-	"enum" ":" <eref: LIdentifier> => api::DeclType::EnumRef(eref),
 };
 
 LOperation: variable::ScalarOp = {
@@ -127,5 +128,44 @@ LTypeRef: api::DeclType = {
 		};
 		let ty = Type::Pointer(Box::new(sty));
 		api::DeclType::Basic(ty)
+	},
+};
+
+LStmt: stmt::Statement = {
+	<expr: LExpr> => stmt::Statement::Expr(expr),
+	<lhs: LExpr> "=" <rhs: LExpr> => {
+		stmt::Statement::Assignment(lhs, rhs)
+	},
+};
+
+LExpr: stmt::Expression = {
+	<sop: LOperation> <id: LIdentifier> => {
+		use std::ops::Deref;
+		use variable::{Generator, GenNothing, Source};
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
+		let s = stmt::Expression::Simple(sop, v.borrow().deref().clone());
+		s
+	},
+	<id: LIdentifier> => {
+		use std::ops::Deref;
+		use variable::{Generator, GenNothing, ScalarOp, Source};
+		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
+		let sop = ScalarOp::Null;
+		let s = stmt::Expression::Simple(sop, v.borrow().deref().clone());
+		s
+	},
+	"function:call" <id: LIdentifier> "{" <args: LExpr*> "}" => {
+		use function;
+		let fauxtype = Type::Builtin(Native::Integer);
+		let mut arglist: Vec<function::Argument> = Vec::new();
+		for a in args {
+			arglist.push(function::Argument::newexpr(&fauxtype, &a));
+		}
+		let v = variable::Source::retval("???rvname???", &id);
+		let rettype = function::ReturnType::new(&fauxtype, v);
+		let fqn = function::Function::new(&id, &rettype, &arglist);
+		stmt::Expression::FqnCall(fqn)
 	},
 };
