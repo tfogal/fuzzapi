@@ -128,7 +128,10 @@ impl Code for Statement {
 				assert_eq!(sym.name, *nm);
 				write!(strm, "{} {} = {};", typ.name(), nm, sym.generator.value())
 			},
-			&Statement::Expr(ref expr) => expr.codegen(strm, pgm),
+			&Statement::Expr(ref expr) => {
+				try!(expr.codegen(strm, pgm));
+				write!(strm, ";")
+			},
 			&Statement::Assignment(ref lhs, ref rhs) => {
 				try!(lhs.codegen(strm, pgm));
 				try!(write!(strm, " = "));

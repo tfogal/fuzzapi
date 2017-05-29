@@ -150,9 +150,23 @@ impl Program {
 		}
 	}
 
+	fn insert_declarations(&mut self) {
+		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.symtab.len());
+		for var in self.symtab.iter() {
+			let s = stmt::Statement::VariableDeclaration(var.name.clone(),
+			                                             var.typ.clone());
+			stmts.push(s);
+		}
+		// declarations need to come first, so we add the existing statements to
+		// what we just created instead of the other way around.
+		stmts.append(&mut self.statements);
+		self.statements = stmts;
+	}
+
 	pub fn analyze(&mut self) -> Result<(),String> {
 		self.populate_typetable();
 		self.populate_symtable();
+		self.insert_declarations();
 		Ok(())
 	}
 
@@ -175,6 +189,12 @@ impl Program {
 
 	pub fn codegen(&self, strm: &mut std::io::Write) ->
 		Result<(),std::io::Error> {
+		use stmt::Code;
+		for stmt in self.statements.iter() {
+			try!(write!(strm, "\t"));
+			try!(stmt.codegen(strm, &self));
+			try!(write!(strm, "\n"));
+		}
 		Ok(())
 	}
 }

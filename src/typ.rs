@@ -127,7 +127,7 @@ impl Name for Type {
 				tryp!(write!(&mut res, "{}*", t.name()));
 				res
 			},
-			&Type::Struct(ref udt, _) => udt.clone(),
+			&Type::Struct(ref udt, _) => "struct ".to_string() + &udt.clone(),
 			&Type::Enum(ref enm, _) => enm.clone(),
 			&Type::Function(ref fqn) => fqn.name.clone(),
 		}
