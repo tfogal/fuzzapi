@@ -1,9 +1,11 @@
 extern crate rand;
+extern crate tempdir;
 use std::collections::HashSet;
 use std::fs::File;
 use std::mem;
 use std::path::Path;
 use std::process::Command;
+use tempdir::TempDir;
 mod api;
 mod function;
 mod fuzz;
@@ -128,6 +130,8 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 	try!(header(strm, &hdrs));
 	try!(writeln!(strm, "")); // just a newline to separate them out.
 
+	let pgm = api::Program::new(&vec![], &vec![]);
+
 	// todo: we need something more intelligent than just a list of functions,
 	// something more like an AST.  For now we just decree that the functions are
 	// given in the order they should be called...
@@ -154,7 +158,7 @@ fn gen(strm: &mut std::io::Write, fqns: &Vec<&Function>) -> std::io::Result<()>
 
 		for (a, ref arg) in fqn.arguments.iter().enumerate() {
 			//let &(_, ref src) = *arg;
-			try!(write!(strm, "{}", arg.codegen()));
+			try!(arg.codegen(strm, &pgm));
 			if a < fqn.arguments.len()-1 {
 				try!(write!(strm, ", "));
 			}
@@ -202,7 +206,7 @@ fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 	let compile = match cmd.output() {
 		Err(e) => {
 			use std::fmt;
-			let s = fmt::format(format_args!("compilation of {} failed: {}", src, e));
+			let s = fmt::format(format_args!("{} compilation failed: {}", src, e));
 			return Err(s);
 		},
 		Ok(x) => x,
@@ -229,11 +233,15 @@ fn compile(src: &str, dest: &str, flags: &Vec<&str>) -> Result<(), String> {
 fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 	use std::fmt;
 
-	let fname: &'static str = "/tmp/fuzziter.c";
-	let mut newtest = match File::create(fname) {
+	let tmpdir = match TempDir::new("hotfuzz") {
+		Err(e) => return Err(fmt::format(format_args!("tmp dir: {}", e))),
+		Ok(t) => t,
+	};
+	let fname = tmpdir.path().join("fuzziter.c");
+	let mut newtest = match File::create(fname.clone()) {
 		Err(e) => {
-			println!("Could not create {}: {}", fname, e); /* FIXME stderr */
-			return Err(fmt::format(format_args!("creating {}: {}", fname, e)));
+			println!("Could not create {:?}: {}", fname, e); /* FIXME stderr */
+			return Err(fmt::format(format_args!("creating {:?}: {}", fname, e)));
 		},
 		Ok(x) => x,
 	};
@@ -246,11 +254,63 @@ fn compile_and_test(api: &Vec<&mut Function>) -> Result<(),String> {
 		Err(x) => return Err(fmt::format(format_args!("gen: {}", x))),
 		Ok(_) => {},
 	};
+	drop(newtest);
+
+	let outname = tmpdir.path().join(".fuzziter");
+	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
+									"-D_GNU_SOURCE", "-UNDEBUG"];
+	let outnm: &str = outname.to_str().unwrap();
+	match compile(fname.to_str().unwrap(), outnm, &args) {
+		Err(x) => return Err(x),
+		Ok(_) => {},
+	};
+
+	let cmdname: String = String::from(outnm);
+	let out = system(cmdname);
+	if out.is_err() {
+		use std::io::Write;
+		writeln!(&mut std::io::stderr(), "Execution error: {}",
+		         out.err().unwrap()).unwrap();
+		std::process::exit(1);
+	}
+	return Ok(());
+}
+
+fn compile_and_test_program(program: &api::Program) -> Result<(),String> {
+	use std::fmt;
+
+	let tmpdir = match TempDir::new("hotfuzz") {
+		Err(e) => return Err(fmt::format(format_args!("tmp dir: {}", e))),
+		Ok(t) => t,
+	};
+	let fname = tmpdir.path().join("fuzziter.c");
+	let mut newtest = match File::create(fname.clone()) {
+		Err(e) => {
+			println!("Could not create {:?}: {}", fname, e); /* FIXME stderr */
+			return Err(fmt::format(format_args!("creating {:?}: {}", fname, e)));
+		},
+		Ok(x) => x,
+	};
+
+	let hdrs: Vec<&str> = vec!["stdlib.h", "search.h"];
+	match program.prologue(&mut newtest, &hdrs) {
+		Err(x) => return Err(fmt::format(format_args!("prologue: {}", x))),
+		_ => (),
+	};
+	match program.codegen(&mut newtest) {
+		Err(x) => return Err(fmt::format(format_args!("codegen: {}", x))),
+		_ => (),
+	}
+	match program.epilogue(&mut newtest) {
+		Err(x) => return Err(fmt::format(format_args!("epilogue: {}", x))),
+		_ => (),
+	}
+	drop(newtest);
 
 	let outname: &'static str = ".fuzziter";
 	let args = vec!["-Wall", "-Wextra", "-fcheck-pointer-bounds", "-mmpx",
 									"-D_GNU_SOURCE", "-UNDEBUG"];
-	match compile(fname, outname, &args) {
+	match compile(fname.to_str().unwrap(), outname, &args) {
 		Err(x) => return Err(x),
 		Ok(_) => {},
 	};
@@ -596,7 +656,7 @@ mod test {
 	}
 
 	#[test]
-	fn hs_case() {
+	fn hash_table_search_case() {
 		let s = "struct hsearch_data {}\n".to_string() +
 			"struct entry { pointer char key; pointer void data; }\n" +
 			"enum ACTION { FIND = 0 , ENTER = 1 , }" +
@@ -616,11 +676,19 @@ mod test {
 			"}\n" +
 			"function:call hcreate_r { nel op:& tbl }\n" +
 			"function:call hsearch_r { item actvar op:& retval op:& tbl }\n";
-		let lprogram = match fuzz::parse_LProgram(s.as_str()) {
+		let mut lprogram = match fuzz::parse_LProgram(s.as_str()) {
 			Err(e) => panic!("{:?}", e),
 			Ok(x) => x,
 		};
 		assert!(lprogram.declarations.len() > 1);
 		assert_eq!(lprogram.statements.len(), 2);
+		match lprogram.analyze() {
+			Err(e) => panic!(e),
+			_ => (),
+		};
+		match compile_and_test_program(&lprogram) {
+			Err(e) => panic!(e),
+			Ok(_) => (),
+		};
 	}
 }

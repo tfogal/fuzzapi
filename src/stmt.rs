@@ -1,3 +1,6 @@
+use std;
+use std::io::{Error};
+use api::*;
 use function::*;
 use typ::*;
 use usergen::Opcode;
@@ -5,7 +8,8 @@ use variable;
 
 // Code is anything we can generate code for.
 pub trait Code {
-	fn codegen(&self) -> String;
+	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
+		-> Result<(),std::io::Error>;
 }
 
 #[derive(Clone,Debug)]
@@ -49,39 +53,37 @@ macro_rules! tryp {
 }
 
 impl Code for Expression {
-	fn codegen(&self) -> String {
-		use std::fmt::Write;
-		let mut rv = String::new();
+	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
+		-> Result<(),Error> {
 		match self {
 			&Expression::Simple(ref op, ref src) => {
 				if src.is_free() {
-					tryp!(write!(rv, "{}{}", op.to_string(), src.name()));
+					try!(write!(strm, "{}{}", op.to_string(), src.name()));
 				} else if src.is_bound() {
 					// correct?
-					tryp!(write!(rv, "{}{}", op.to_string(), src.root().name()));
+					try!(write!(strm, "{}{}", op.to_string(), src.root().name()));
 				} else if src.is_retval() {
-					tryp!(write!(rv, "/*fixme, from ret!*/"));
+					try!(write!(strm, "/*fixme, from ret!*/"));
 					unreachable!(); // right?
 				} else {
 					unreachable!();
 				}
-				rv
+				Ok(())
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
-				lhs.codegen() + " " + op.to_string().as_str() + " " +
-				rhs.codegen().as_str()
+				try!(lhs.codegen(strm, program));
+				try!(write!(strm, " {} ", op.to_string()));
+				rhs.codegen(strm, program)
 			},
 			&Expression::FqnCall(ref fqn) => {
-				let mut rv = String::new();
-				tryp!(write!(&mut rv, "{}(", fqn.name));
+				try!(write!(strm, "{}(", fqn.name));
 				for (a, arg) in fqn.arguments.iter().enumerate() {
-					tryp!(write!(&mut rv, "{}", arg.codegen()));
+					try!(arg.codegen(strm, program));
 					if a != fqn.arguments.len()-1 {
-						tryp!(write!(&mut rv, ", "));
+						try!(write!(strm, ", "));
 					}
 				}
-				tryp!(write!(&mut rv, ")"));
-				rv
+				write!(strm, ")")
 			},
 		}
 	}
@@ -91,8 +93,8 @@ impl Expression {
 	// This creates variable declarations for everything that goes into this
 	// expression.  Functions are ignored.
 	pub fn decl(&self) -> String {
-		use std::fmt::Write;
 		let mut rv: String = String::new();
+		use std::fmt::Write;
 		match self {
 			&Expression::Simple(_, ref src) => {
 				let nm = src.name();
@@ -108,8 +110,9 @@ impl Expression {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Statement {
+	VariableDeclaration(String /* name */, Type),
 	Expr(Expression),
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
@@ -117,14 +120,25 @@ pub enum Statement {
 }
 
 impl Code for Statement {
-	fn codegen(&self) -> String {
+	fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
+		-> Result<(),Error> {
 		match self {
-			&Statement::Expr(ref expr) => expr.codegen(),
+			&Statement::VariableDeclaration(ref nm, ref typ) => {
+				let sym = pgm.symlookup(nm).unwrap();
+				assert_eq!(sym.name, *nm);
+				write!(strm, "{} {} = {};", typ.name(), nm, sym.generator.value())
+			},
+			&Statement::Expr(ref expr) => expr.codegen(strm, pgm),
 			&Statement::Assignment(ref lhs, ref rhs) => {
-				lhs.codegen() + " = " + rhs.codegen().as_str() + ";"
+				try!(lhs.codegen(strm, pgm));
+				try!(write!(strm, " = "));
+				try!(rhs.codegen(strm, pgm));
+				write!(strm, ";")
 			},
 			&Statement::Verify(ref expr) => {
-				"assert(".to_string() + expr.codegen().as_str() + ");"
+				try!(write!(strm, "assert("));
+				try!(expr.codegen(strm, pgm));
+				write!(strm, ");")
 			},
 		}
 	}
@@ -133,25 +147,37 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use std::ops::Deref;
 	use variable::*;
+
+	macro_rules! cg_expect {
+		($left:expr, $expected:expr, $pgm:expr) => (
+			let mut strm: Vec<u8> = Vec::new();
+			match $left.codegen(&mut strm, &$pgm) {
+				Err(e) => panic!(e),
+				Ok(_) => (),
+			};
+			assert_eq!(String::from_utf8(strm).unwrap(), $expected);
+		)
+	}
 
 	#[test]
 	fn simple_expr() {
+		let pgm = Program::new(&vec![], &vec![]);
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let null = variable::ScalarOp::Null;
 		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
 		                                 "", &g);
-		use std::ops::Deref;
 		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
-		assert_eq!(expr.codegen(), "varname");
+		cg_expect!(expr, "varname", pgm);
 		drop(expr);
 
 		// make sure address of affects codegen.
 		let addrof = variable::ScalarOp::AddressOf;
 		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), "",&g);
 		let expr = Expression::Simple(addrof, v2.deref().borrow().clone());
-		assert_eq!(expr.codegen(), "&var2");
+		cg_expect!(expr, "&var2", pgm);
 		drop(expr);
 
 		// make sure deref affects codegen.
@@ -159,13 +185,14 @@ mod test {
 		let ptr = Type::Pointer(Box::new(Type::Builtin(Native::I32)));
 		let v3 = variable::Source::free("var3", &ptr, "", &g);
 		let expr = Expression::Simple(addrof, v3.deref().borrow().clone());
-		assert_eq!(expr.codegen(), "*var3");
+		cg_expect!(expr, "*var3", pgm);
 	}
 
 	macro_rules! compoundtest {
 		($left:expr, $op:expr, $right:expr, $gennedcode:expr) => (
+			let pgm = Program::new(&vec![], &vec![]);
 			let cp_ = Expression::Compound($left.clone(), $op, $right.clone());
-			assert_eq!(cp_.codegen(), $gennedcode);
+			cg_expect!(cp_, $gennedcode, pgm);
 			drop(cp_);
 		)
 	}
@@ -189,20 +216,21 @@ mod test {
 
 	#[test]
 	fn fqn_expr() {
+		let pgm = Program::new(&vec![], &vec![]);
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), "", &g);
 		let rv = ReturnType::new(&Type::Builtin(Native::I32), r);
 		let fqn = Function::new("f", &rv, &vec![]);
 		let fexpr = Expression::FqnCall(fqn);
 		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
-		assert_eq!(fexpr.codegen(), "f()");
+		cg_expect!(fexpr, "f()", pgm);
 		drop(fexpr);
 
 		// make sure it codegen's single argument...
 		let fvar = variable::Source::free("Fv", &Type::Builtin(Native::I32), "",&g);
 		let arg = Argument::new(&Type::Builtin(Native::I32), fvar);
 		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
-		assert_eq!(fqn.codegen(), "g(Fv)");
+		cg_expect!(fqn, "g(Fv)", pgm);
 		drop(fqn);
 
 		// .. and that it puts commas if there's an arglist...
@@ -211,11 +239,12 @@ mod test {
 		let a0 = Argument::new(&Type::Builtin(Native::I32), va);
 		let a1 = Argument::new(&Type::Builtin(Native::I32), vb);
 		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
-		assert_eq!(fqn.codegen(), "h(Va, Vb)");
+		cg_expect!(fqn, "h(Va, Vb)", pgm);
 	}
 
 	#[test]
 	fn expr_statement() {
+		let pgm = Program::new(&vec![], &vec![]);
 		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 
@@ -223,19 +252,20 @@ mod test {
 		let src = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
-		assert_eq!(sstmt.codegen(), "a");
+		cg_expect!(sstmt, "a", pgm);
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
 		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(drf, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
-		assert_eq!(sstmt.codegen(), "*b");
+		cg_expect!(sstmt, "*b", pgm);
 		drop(sstmt); drop(src);
 	}
 
 	#[test]
 	fn assignment_stmt() {
+		let pgm = Program::new(&vec![], &vec![]);
 		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
@@ -244,18 +274,19 @@ mod test {
 		let srcexp = Expression::Simple(null, src.deref().borrow().clone());
 		let dstexp = Expression::Simple(null, dst.deref().borrow().clone());
 		let sstmt = Statement::Assignment(dstexp, srcexp);
-		assert_eq!(sstmt.codegen(), "a = b;");
+		cg_expect!(sstmt, "a = b;", pgm);
 	}
 
 	#[test]
 	fn verify_stmt() {
+		let pgm = Program::new(&vec![], &vec![]);
 		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
 		let expr = Expression::Simple(null, vara.deref().borrow().clone());
 		let vstmt = Statement::Verify(expr);
-		assert_eq!(vstmt.codegen(), "assert(a);");
+		cg_expect!(vstmt, "assert(a);", pgm);
 	}
 
 	#[test]

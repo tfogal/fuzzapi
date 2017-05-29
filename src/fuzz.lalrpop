@@ -8,7 +8,7 @@ grammar;
 
 pub LProgram : api::Program = {
 	<decls: LDeclarations> <stmts: LStmt*> => {
-		api::Program{declarations: decls, statements: stmts}
+		api::Program::new(&decls, &stmts)
 	},
 };
 

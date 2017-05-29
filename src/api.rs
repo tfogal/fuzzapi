@@ -5,14 +5,17 @@
 // sense for parsing, because it lets us parse without worrying too
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
+use std;
 use std::cell::RefCell;
 use std::rc::Rc;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
 use variable;
+use variable::Generator;
 
-#[derive(Debug)]
+
+#[derive(Clone, Debug)]
 pub enum DeclType {
 	Basic(Type),
 	Struct(String, Vec<UDTDecl>),
@@ -34,20 +37,20 @@ impl DeclType {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UDTDecl {
 	pub name: String,
 	pub ty: DeclType,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FreeVarDecl {
 	pub name: String,
 	pub genname: String,
 	pub ty: DeclType, // Struct(...) and Enum(...) are not valid, but *Refs are.
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FuncDecl {
 	pub name: String,
 	pub retval: DeclType,
@@ -61,7 +64,7 @@ pub struct FuncCall {
 	pub arguments: Vec<String>, // arguments encoded as a string.
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Declaration {
 	Free(FreeVarDecl),
 	Function(FuncDecl),
@@ -69,9 +72,111 @@ pub enum Declaration {
 }
 
 #[derive(Debug)]
+pub struct Symbol {
+	pub name: String,
+	pub generator: Box<variable::Generator>, // actual, used generator.
+	pub typ: Type,
+}
+
+#[derive(Debug)]
 pub struct Program {
 	pub declarations: Vec<Declaration>,
 	pub statements: Vec<stmt::Statement>,
+	symtab: Vec<Symbol>,
+	typetab: Vec<Type>,
+	// copy of generator list.  Expected users will clone() out of it to create
+	// the real/used Generators (that live in the symbol table).
+	genlist: Vec<Box<variable::Generator>>,
+}
+
+impl Program {
+	pub fn new(decls: &Vec<Declaration>, stmts: &Vec<stmt::Statement>)
+		-> Program {
+		Program{declarations: (*decls).clone(), statements: (*stmts).clone(),
+		        symtab: Vec::new(), typetab: Vec::new(), genlist: Vec::new()}
+	}
+
+	pub fn set_generators(&mut self, gens: &Vec<Box<Generator>>) {
+		self.genlist.clear();
+		for g in gens {
+			self.genlist.push((*g).clone());
+		}
+	}
+
+	pub fn symlookup<'a>(&'a self, symname: &str) -> Option<&'a Symbol> {
+		for s in self.symtab.iter() {
+			if s.name == symname {
+				return Some(s);
+			}
+		}
+		None
+	}
+
+	fn genlookup(&self, ty: &Type, genname: &str) -> Option<Box<Generator>> {
+		for gen in self.genlist.iter() {
+			if gen.name() == genname {
+				return Some((*gen).clone());
+			}
+		}
+		// if we didn't find any in the list, try to create one from the type.
+		Some(variable::generator(ty))
+	}
+
+	fn populate_symtable(&mut self) {
+		for ref decl in self.declarations.iter() {
+			match **decl {
+				Declaration::Free(ref fvd) => {
+					let ty = type_from_decl(&fvd.ty, &self.typetab);
+					let gen = self.genlookup(&ty, &fvd.genname).unwrap();
+					let sym = Symbol{name: fvd.name.clone(), generator: gen, typ: ty};
+					self.symtab.push(sym);
+				},
+				Declaration::Function(_) => (),
+				Declaration::UDT(_) => (),
+			}
+		}
+	}
+
+	fn populate_typetable(&mut self) {
+		for ref decl in self.declarations.iter() {
+			match **decl {
+				Declaration::UDT(ref udt) => {
+					let typ = type_from_decl(&udt, &self.typetab);
+					self.typetab.push(typ);
+				},
+				Declaration::Free(_) => (),
+				Declaration::Function(_) => (),
+			}
+		}
+	}
+
+	pub fn analyze(&mut self) -> Result<(),String> {
+		self.populate_typetable();
+		self.populate_symtable();
+		Ok(())
+	}
+
+	pub fn prologue(&self, strm: &mut std::io::Write, headers: &Vec<&str>) ->
+		std::io::Result<()> {
+		try!(writeln!(strm, "#define _POSIX_C_SOURCE 201212L"));
+		try!(writeln!(strm, "#define _GNU_SOURCE 1"));
+		for h in headers.iter() {
+			try!(writeln!(strm, "#include <{}>", h));
+		}
+		try!(write!(strm, "\n"));
+		try!(writeln!(strm, "int main() {{"));
+		return Ok(());
+	}
+
+	pub fn epilogue(&self, strm: &mut std::io::Write) -> std::io::Result<()> {
+		try!(writeln!(strm, "\n\treturn 0;\n}}"));
+		return Ok(());
+	}
+
+	pub fn codegen(&self, strm: &mut std::io::Write) ->
+		Result<(),std::io::Error> {
+		Ok(())
+	}
 }
 
 // gives the type from the declaration.
@@ -128,7 +233,23 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 			}
 			rv
 		}
-		&DeclType::EnumRef(_) => unimplemented!(),
+		&DeclType::EnumRef(ref nm) => {
+			let mut rv: Type = Type::Builtin(Native::Void);
+			for typex in types {
+				match typex {
+					&Type::Enum(ref enm, _) if enm == nm => rv = typex.clone(),
+					&Type::Enum(ref enm, _) => {
+						println!("Enum '{}' is not a match for '{}'", enm, nm);
+					}
+					_ => {},
+				};
+			}
+			/* Didn't find it?  Then bail, unknown type! */
+			if rv == Type::Builtin(Native::Void) {
+				panic!("Unknown enum '{}'!", nm);
+			}
+			rv
+		},
 	}
 }
 

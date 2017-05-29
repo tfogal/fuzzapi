@@ -1,5 +1,8 @@
+use std;
 use std::cell::RefCell;
+use std::io::Error;
 use std::rc::Rc;
+use api::*;
 use stmt;
 use typ::*;
 use variable::Source;
@@ -51,9 +54,10 @@ impl Argument {
 	pub fn decl(&self) -> String {
 		self.expr.decl()
 	}
-	pub fn codegen(&self) -> String {
+	pub fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
+		-> Result<(),Error> {
 		use stmt::Code;
-		self.expr.codegen()
+		self.expr.codegen(strm, pgm)
 	}
 }
 
