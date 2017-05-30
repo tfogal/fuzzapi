@@ -30,30 +30,6 @@ impl Argument {
 		}
 	}
 
-	pub fn done(&self) -> bool {
-		match self.expr {
-			stmt::Expression::Simple(_, ref s) => s.generator.done(),
-			_ => unimplemented!(),
-		}
-	}
-	pub fn reset(&mut self) {
-		use std::ops::DerefMut;
-		match self.expr {
-			stmt::Expression::Simple(_, ref mut s) => s.generator.deref_mut().reset(),
-			_ => unimplemented!(),
-		}
-	}
-	pub fn next(&mut self) {
-		use std::ops::DerefMut;
-		match self.expr {
-			stmt::Expression::Simple(_, ref mut s) => s.generator.deref_mut().next(),
-			_ => unimplemented!(),
-		}
-	}
-
-	pub fn decl(&self) -> String {
-		self.expr.decl()
-	}
 	pub fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
 		-> Result<(),Error> {
 		use stmt::Code;

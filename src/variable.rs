@@ -66,7 +66,7 @@ impl Source {
 	}
 
 	pub fn bound(parent: Rc<RefCell<Source>>) -> Rc<RefCell<Source>> {
-		let typesave =  { parent.borrow().ty.clone() };
+		let typesave = { parent.borrow().ty.clone() };
 		Rc::new(RefCell::new(Source{
 			name: "".to_string(), generator: Box::new(GenNothing{}),
 			parent: Some(parent),

@@ -77,6 +77,12 @@ pub struct Symbol {
 	pub generator: Box<variable::Generator>, // actual, used generator.
 	pub typ: Type,
 }
+impl PartialEq for Symbol {
+	fn eq(&self, other: &Symbol) -> bool {
+		return self.name == other.name && self.typ == other.typ;
+	}
+}
+impl Eq for Symbol {}
 
 #[derive(Debug)]
 pub struct Program {
@@ -122,6 +128,7 @@ impl Program {
 		Some(variable::generator(ty))
 	}
 
+	// Creates an entry in the symtable for every variable in the program.
 	fn populate_symtable(&mut self) {
 		for ref decl in self.declarations.iter() {
 			match **decl {
@@ -137,6 +144,7 @@ impl Program {
 		}
 	}
 
+	// Ensures there is a type for every declaration.
 	fn populate_typetable(&mut self) {
 		for ref decl in self.declarations.iter() {
 			match **decl {
@@ -150,7 +158,25 @@ impl Program {
 		}
 	}
 
+	// Our parsing is a bit weird in that it generates both declarations and then
+	// a list of statements.  Undo the weirdness by converting all the
+	// declarations into VarDecl statements, so that we can then just codegen()
+	// all the statements without worrying it'll break stuff.
+	// We should really just fix our parser to generate Declaration Statements in
+	// the first place...
 	fn insert_declarations(&mut self) {
+		// first a quick error check. this method converts declarations into
+		// statements. thus it should only be called once, else you'll end up with
+		// duplicate declarations. Make sure there are no VarDecls in our target.
+		for stmt in self.statements.iter() {
+			match stmt {
+				&stmt::Statement::VariableDeclaration(ref nm, ref typ) => {
+					panic!("VarDecl for {:?}:{:?} already in statements!", nm, typ);
+				},
+				_ => (),
+			};
+		}
+
 		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.symtab.len());
 		for var in self.symtab.iter() {
 			let s = stmt::Statement::VariableDeclaration(var.name.clone(),
@@ -197,6 +223,41 @@ impl Program {
 			try!(write!(strm, "\n"));
 		}
 		Ok(())
+	}
+
+	// We are done when all the generators for every symbol have reached their
+	// end state.
+	pub fn done(&self) -> bool {
+		return self.symtab.iter().all(
+			|ref sym| sym.generator.done()
+		);
+	}
+
+	// Iterate. Move the most-appropriate generator to its next state.
+	// precondition: !self.done()
+	pub fn next(&mut self) {
+		// find the last symbol which is not done.
+		let nxt = match self.symtab.iter().rposition(|ref sym| {
+			!sym.generator.done()
+		}) {
+			None => panic!("No next state?"),
+			Some(idx) => idx,
+		};
+		assert!(!self.symtab[nxt].generator.done());
+		// Iterate that 'last not-done symbol'.
+		self.symtab[nxt].generator.next();
+
+		// reset all subsequent symbols.
+		for idx in nxt+1..self.symtab.len() {
+			self.symtab[idx].generator.reset();
+		}
+	}
+
+	// Counts the number of states this program represents.
+	pub fn n_states(&self) -> usize {
+		return self.symtab.iter().fold(1, |n: usize, ref sym| {
+			return n*sym.generator.n_state();
+		});
 	}
 }
 
