@@ -30,8 +30,6 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 		for (a, arg) in fqn.arguments.iter().enumerate() {
 			if arg.source().is_free() {
 				tryp!(write!(strm, "{:?}", arg.source().generator));
-			} else if arg.source().is_bound() {
-				tryp!(write!(strm, "(bound)"));
 			} else if arg.source().is_retval() {
 				tryp!(write!(strm, "(rv)"));
 			}
@@ -435,9 +433,17 @@ mod test {
 			Err(e) => panic!(e),
 			_ => (),
 		};
-		match compile_and_test_program(&lprogram) {
-			Err(e) => panic!(e),
-			Ok(_) => (),
+		let hdrs: Vec<&str> = vec!["stdlib.h", "search.h"];
+		let mut strm: Vec<u8> = Vec::new();
+		match lprogram.prologue(&mut strm, &hdrs) {
+			Err(e) => panic!(e), Ok(_) => (),
 		};
+		match lprogram.codegen(&mut strm) {
+			Err(e) => panic!(e), Ok(_) => (),
+		}
+		match lprogram.epilogue(&mut strm) {
+			Err(e) => panic!(e), Ok(_) => (),
+		}
+		drop(strm);
 	}
 }

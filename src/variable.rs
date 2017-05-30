@@ -14,9 +14,6 @@ use tc::*;
 pub struct Source {
 	name: String,
 	pub generator: Box<Generator>,
-	// todo fixme: Source should not have a ScalarOp attached.  That should be in
-	// Expression or similar.
-	pub parent: Option<Rc<RefCell<Source>>>,
 	pub ty: Type,
 	fqn: String,
 }
@@ -28,7 +25,7 @@ pub struct Source {
 impl Clone for Source {
 	fn clone(&self) -> Self {
 		Source{name: self.name.clone(), generator: self.generator.clone(),
-		       parent: self.parent.clone(), ty: self.ty.clone(),
+		       ty: self.ty.clone(),
 		       fqn: self.fqn.clone()}
 	}
 
@@ -54,7 +51,6 @@ impl Source {
 		};
 		Rc::new(RefCell::new(Source{
 			name: nm.to_string(), generator: g,
-			parent: None,
 			ty: typ.clone(), fqn: "".to_string(),
 		}))
 	}
@@ -65,24 +61,10 @@ impl Source {
 		return self.name.len() != 0 && self.fqn.len() == 0;
 	}
 
-	pub fn bound(parent: Rc<RefCell<Source>>) -> Rc<RefCell<Source>> {
-		let typesave = { parent.borrow().ty.clone() };
-		Rc::new(RefCell::new(Source{
-			name: "".to_string(), generator: Box::new(GenNothing{}),
-			parent: Some(parent),
-			ty: typesave,
-			fqn: "".to_string(),
-		}))
-	}
-	pub fn is_bound(&self) -> bool {
-		return self.parent.is_some();
-	}
-
 	pub fn retval(name: &str, fqn: &str) -> Rc<RefCell<Source>> {
 		println!("WARNING: using broken retval type");
 		Rc::new(RefCell::new(Source{
 			name: name.to_string(), generator: Box::new(GenNothing{}),
-			parent: None,
 			ty: Type::Builtin(Native::U8), /* FIXME broken */
 			fqn: fqn.to_string(),
 		}))
@@ -90,24 +72,11 @@ impl Source {
 	pub fn is_retval(&self) -> bool {
 		return self.fqn.len() != 0;
 	}
-
-	// Follows the links of parent chains until it gets to a root.
-	pub fn root(&self) -> Source {
-		use std::ops::Deref;
-		match self.parent {
-			Some(ref p) => p.borrow().deref().root(),
-			None => self.clone(),
-		}
-	}
 }
 
 impl Name for Source {
 	fn name(&self) -> String {
 		if self.is_free() { return self.name.clone(); }
-		if self.is_bound() {
-			let par = self.parent.clone().unwrap(); // appease borrow checker.
-			return par.borrow().name();
-		}
 		if self.is_retval() { return self.fqn.clone(); }
 		println!("invalid source: {:?}", self);
 		unreachable!();
@@ -687,34 +656,5 @@ mod test {
 		let cpy = it.clone();
 		use std::ops::Deref;
 		assert_eq!(cpy.borrow().deref().name, it.borrow().deref().name);
-	}
-
-	#[test]
-	fn test_src_clone_multiple() {
-		let intg = Type::Builtin(Native::Integer);
-		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let orig = Source::free("item", &intg, "", &generators);
-		let par = Source::bound(orig);
-		match par.borrow().parent {
-			None => panic!("no parent?"), _ => {},
-		};
-		let cpy = par.clone();
-		match par.borrow().parent {
-			None => panic!("no parent, 2nd round?"), _ => {},
-		};
-		assert!(cpy.borrow().is_bound());
-	}
-
-	#[test]
-	fn test_src_parent() {
-		let intg = Type::Builtin(Native::Usize);
-		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let orig = Source::free("item", &intg, "", &generators);
-		let par = Source::bound(orig);
-		let par2: Source = par.borrow().clone();
-		assert!(par.borrow().is_bound());
-		assert!(par2.is_bound());
-		let rt = par.borrow().root();
-		assert_eq!(rt.name, "item");
 	}
 }

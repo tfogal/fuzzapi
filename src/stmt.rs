@@ -28,11 +28,11 @@ impl Expression {
 	pub fn extype(&self) -> Type {
 		match self {
 			&Expression::Simple(ref op, ref src) => {
-				let tbasic = src.root();
 				match op {
-					&variable::ScalarOp::Null => tbasic.ty,
-					&variable::ScalarOp::Deref => tbasic.ty.dereference(),
-					&variable::ScalarOp::AddressOf => Type::Pointer(Box::new(tbasic.ty)),
+					&variable::ScalarOp::Null => src.ty.clone(),
+					&variable::ScalarOp::Deref => src.ty.dereference(),
+					&variable::ScalarOp::AddressOf =>
+						Type::Pointer(Box::new(src.ty.clone())),
 				}
 			}
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
@@ -59,9 +59,6 @@ impl Code for Expression {
 			&Expression::Simple(ref op, ref src) => {
 				if src.is_free() {
 					try!(write!(strm, "{}{}", op.to_string(), src.name()));
-				} else if src.is_bound() {
-					// correct?
-					try!(write!(strm, "{}{}", op.to_string(), src.root().name()));
 				} else if src.is_retval() {
 					try!(write!(strm, "/*fixme, from ret!*/"));
 					unreachable!(); // right?
