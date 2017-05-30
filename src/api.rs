@@ -57,13 +57,6 @@ pub struct FuncDecl {
 	pub arguments: Vec<DeclType>,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct FuncCall {
-	pub name: String,
-	pub retval: String, // the type name encoded as a string
-	pub arguments: Vec<String>, // arguments encoded as a string.
-}
-
 #[derive(Clone, Debug)]
 pub enum Declaration {
 	Free(FreeVarDecl),
