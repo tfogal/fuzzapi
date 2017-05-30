@@ -41,7 +41,7 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 	}
 }
 
-fn system(cmd: String) -> Result<(), String> {
+fn system(cmd: &str) -> Result<(), String> {
 	let run = match Command::new(cmd.clone()).output() {
 		Err(e) => {
 			use std::fmt;
@@ -140,7 +140,7 @@ fn compile_and_test_program(program: &api::Program) -> Result<(),String> {
 		Ok(_) => {},
 	};
 
-	let out = system(String::from(outnm));
+	let out = system(outnm);
 	if out.is_err() {
 		use std::io::Write;
 		writeln!(&mut std::io::stderr(), "Execution error: {}",
