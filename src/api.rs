@@ -167,6 +167,7 @@ impl Program {
 		self.populate_typetable();
 		self.populate_symtable();
 		self.insert_declarations();
+		self.genlist.clear();
 		Ok(())
 	}
 
