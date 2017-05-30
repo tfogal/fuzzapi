@@ -86,27 +86,6 @@ impl Code for Expression {
 	}
 }
 
-impl Expression {
-	// This creates variable declarations for everything that goes into this
-	// expression.  Functions are ignored.
-	pub fn decl(&self) -> String {
-		let mut rv: String = String::new();
-		use std::fmt::Write;
-		match self {
-			&Expression::Simple(_, ref src) => {
-				let nm = src.name();
-				write!(&mut rv, "{} {} = {};", src.ty.name(), nm,
-				       src.generator.value()).unwrap();
-			},
-			&Expression::Compound(ref lhs, _, ref rhs) => {
-				write!(&mut rv, "{}\n{}\n", lhs.decl(), rhs.decl()).unwrap();
-			},
-			&Expression::FqnCall(_) => {},
-		}
-		rv
-	}
-}
-
 #[derive(Clone, Debug)]
 pub enum Statement {
 	VariableDeclaration(String /* name */, Type),
@@ -287,17 +266,5 @@ mod test {
 		let expr = Expression::Simple(null, vara.deref().borrow().clone());
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
-	}
-
-	#[test]
-	fn decl_simple() {
-		use std::ops::Deref;
-		let null = variable::ScalarOp::Null;
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
-		let expr = Expression::Simple(null, vara.deref().borrow().clone());
-		/* The value here is very dependent on the initial state of the default
-		 * generator for I32... */
-		assert_eq!(expr.decl(), "int32_t a = -2147483648;");
 	}
 }
