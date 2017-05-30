@@ -255,14 +255,14 @@ mod test {
 		let src = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(null, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
-		cg_expect!(sstmt, "a", pgm);
+		cg_expect!(sstmt, "a;", pgm);
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
 		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
 		let expr = Expression::Simple(drf, src.deref().borrow().clone());
 		let sstmt = Statement::Expr(expr);
-		cg_expect!(sstmt, "*b", pgm);
+		cg_expect!(sstmt, "*b;", pgm);
 		drop(sstmt); drop(src);
 	}
 
