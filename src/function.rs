@@ -1,7 +1,5 @@
 use std;
-use std::cell::RefCell;
 use std::io::Error;
-use std::rc::Rc;
 use api::*;
 use stmt;
 use typ::*;
@@ -13,11 +11,9 @@ pub struct Argument {
 	pub expr: stmt::Expression,
 }
 impl Argument {
-	pub fn new(t: &Type, s: Rc<RefCell<Source>>) -> Self {
+	pub fn new(t: &Type, s: Source) -> Self {
 		use variable;
-		use std::ops::Deref;
-		let exp = stmt::Expression::Simple(variable::ScalarOp::Null,
-		                                   s.borrow().deref().clone());
+		let exp = stmt::Expression::Simple(variable::ScalarOp::Null, s);
 		Argument{ty: t.clone(), expr: exp}
 	}
 	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
@@ -40,10 +36,10 @@ impl Argument {
 #[derive(Clone, Debug)]
 pub struct ReturnType {
 	pub ty: Type,
-	pub src: Rc<RefCell<Source>>,
+	pub src: Source,
 }
 impl ReturnType {
-	pub fn new(t: &Type, s: Rc<RefCell<Source>>) -> Self {
+	pub fn new(t: &Type, s: Source) -> Self {
 		ReturnType{ty: t.clone(), src: s}
 	}
 }

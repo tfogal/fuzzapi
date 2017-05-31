@@ -140,20 +140,18 @@ LStmt: stmt::Statement = {
 
 LExpr: stmt::Expression = {
 	<sop: LOperation> <id: LIdentifier> => {
-		use std::ops::Deref;
 		use variable::{Generator, GenNothing, Source};
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
-		let s = stmt::Expression::Simple(sop, v.borrow().deref().clone());
+		let s = stmt::Expression::Simple(sop, v);
 		s
 	},
 	<id: LIdentifier> => {
-		use std::ops::Deref;
 		use variable::{Generator, GenNothing, ScalarOp, Source};
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
 		let sop = ScalarOp::Null;
-		let s = stmt::Expression::Simple(sop, v.borrow().deref().clone());
+		let s = stmt::Expression::Simple(sop, v);
 		s
 	},
 	"function:call" <id: LIdentifier> "{" <args: LExpr*> "}" => {

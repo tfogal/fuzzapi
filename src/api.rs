@@ -6,8 +6,6 @@
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
 use std;
-use std::cell::RefCell;
-use std::rc::Rc;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
@@ -331,8 +329,7 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
                   gen: &Vec<Box<variable::Generator>>) -> function::Function {
 	let rtype = type_from_decl(&fqn.retval, &types);
-	let fauxsrc : Rc<RefCell<variable::Source>> =
-		variable::Source::free("???", &rtype, "std:nothing", &gen);
+	let fauxsrc = variable::Source::free("???", &rtype, "std:nothing", &gen);
 	let retv = function::ReturnType::new(&rtype, fauxsrc);
 	let mut rv = function::Function{
 		name: fqn.name.clone(),
@@ -341,8 +338,7 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 	};
 	for arg in fqn.arguments.iter() {
 		let typedecl: Type = type_from_decl(&arg, &types);
-		let src: Rc<RefCell<variable::Source>> =
-			variable::Source::free("???", &typedecl, "std:nothing", &gen);
+		let src = variable::Source::free("???", &typedecl, "std:nothing", &gen);
 		rv.arguments.push(function::Argument::new(&typedecl, src));
 	}
 	return rv;
@@ -352,10 +348,10 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 // potentially panic'ing due to invalid semantics.
 pub fn resolve_types(decls: &Vec<Declaration>,
                      generators: &mut Vec<Box<variable::Generator>>) ->
-	(Vec<Type>, Vec<Rc<RefCell<variable::Source>>>) {
+	(Vec<Type>, Vec<variable::Source>) {
 	assert!(decls.len() > 0);
 	let mut drv: Vec<Type> = Vec::new();
-	let mut vars: Vec<Rc<RefCell<variable::Source>>> = Vec::new();
+	let mut vars: Vec<variable::Source> = Vec::new();
 
 	for decl in decls {
 		match decl {

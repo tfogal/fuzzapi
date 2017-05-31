@@ -126,7 +126,6 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use std::ops::Deref;
 	use variable::*;
 
 	macro_rules! cg_expect {
@@ -147,7 +146,7 @@ mod test {
 		let null = variable::ScalarOp::Null;
 		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
 		                                 "", &g);
-		let expr = Expression::Simple(null, src.deref().borrow().clone());
+		let expr = Expression::Simple(null, src);
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
 		cg_expect!(expr, "varname", pgm);
 		drop(expr);
@@ -155,7 +154,7 @@ mod test {
 		// make sure address of affects codegen.
 		let addrof = variable::ScalarOp::AddressOf;
 		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), "",&g);
-		let expr = Expression::Simple(addrof, v2.deref().borrow().clone());
+		let expr = Expression::Simple(addrof, v2);
 		cg_expect!(expr, "&var2", pgm);
 		drop(expr);
 
@@ -163,7 +162,7 @@ mod test {
 		let addrof = variable::ScalarOp::Deref;
 		let ptr = Type::Pointer(Box::new(Type::Builtin(Native::I32)));
 		let v3 = variable::Source::free("var3", &ptr, "", &g);
-		let expr = Expression::Simple(addrof, v3.deref().borrow().clone());
+		let expr = Expression::Simple(addrof, v3);
 		cg_expect!(expr, "*var3", pgm);
 	}
 
@@ -177,13 +176,12 @@ mod test {
 	}
 	#[test]
 	fn compound_expr() {
-		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), "", &g);
 		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let el = Box::new(Expression::Simple(null, l.deref().borrow().clone()));
-		let er = Box::new(Expression::Simple(null, r.deref().borrow().clone()));
+		let el = Box::new(Expression::Simple(null, l));
+		let er = Box::new(Expression::Simple(null, r));
 		compoundtest!(el, Opcode::Add, er, "LHS + RHS");
 		compoundtest!(el, Opcode::Sub, er, "LHS - RHS");
 		compoundtest!(el, Opcode::Mul, er, "LHS * RHS");
@@ -224,19 +222,18 @@ mod test {
 	#[test]
 	fn expr_statement() {
 		let pgm = Program::new(&vec![], &vec![]);
-		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 
 		let null = variable::ScalarOp::Null;
 		let src = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
-		let expr = Expression::Simple(null, src.deref().borrow().clone());
+		let expr = Expression::Simple(null, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "a;", pgm);
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
 		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
-		let expr = Expression::Simple(drf, src.deref().borrow().clone());
+		let expr = Expression::Simple(drf, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "*b;", pgm);
 		drop(sstmt); drop(src);
@@ -245,13 +242,12 @@ mod test {
 	#[test]
 	fn assignment_stmt() {
 		let pgm = Program::new(&vec![], &vec![]);
-		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let srcexp = Expression::Simple(null, src.deref().borrow().clone());
-		let dstexp = Expression::Simple(null, dst.deref().borrow().clone());
+		let srcexp = Expression::Simple(null, src);
+		let dstexp = Expression::Simple(null, dst);
 		let sstmt = Statement::Assignment(dstexp, srcexp);
 		cg_expect!(sstmt, "a = b;", pgm);
 	}
@@ -259,11 +255,10 @@ mod test {
 	#[test]
 	fn verify_stmt() {
 		let pgm = Program::new(&vec![], &vec![]);
-		use std::ops::Deref;
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
 		let null = variable::ScalarOp::Null;
-		let expr = Expression::Simple(null, vara.deref().borrow().clone());
+		let expr = Expression::Simple(null, vara);
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
 	}

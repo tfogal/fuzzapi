@@ -4,13 +4,12 @@
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
 extern crate rand;
-use std::cell::RefCell;
-use std::rc::Rc;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
 use tc::*;
 
 #[derive(Debug)]
+// todo/fixme: kill this and use api::Symbol everywhere instead.
 pub struct Source {
 	name: String,
 	pub generator: Box<Generator>,
@@ -43,16 +42,16 @@ impl Source {
 	// Construct a free variable of the given type, using the given generator.
 	// The generator can be the null string to search for a default one.
 	pub fn free(nm: &str, typ: &Type, gen: &str, list: &Vec<Box<Generator>>) ->
-		Rc<RefCell<Source>> {
+		Source {
 		let g: Box<Generator> = match generator_list(gen, &list) {
 			Some(x) => x,
 			// if we can't find an appropriate generator, try to auto-create one.
 			None => generator(typ),
 		};
-		Rc::new(RefCell::new(Source{
+		Source{
 			name: nm.to_string(), generator: g,
 			ty: typ.clone(), fqn: "".to_string(),
-		}))
+		}
 	}
 
 	pub fn is_free(&self) -> bool {
@@ -61,13 +60,13 @@ impl Source {
 		return self.name.len() != 0 && self.fqn.len() == 0;
 	}
 
-	pub fn retval(name: &str, fqn: &str) -> Rc<RefCell<Source>> {
+	pub fn retval(name: &str, fqn: &str) -> Source {
 		println!("WARNING: using broken retval type");
-		Rc::new(RefCell::new(Source{
+		Source{
 			name: name.to_string(), generator: Box::new(GenNothing{}),
 			ty: Type::Builtin(Native::U8), /* FIXME broken */
 			fqn: fqn.to_string(),
-		}))
+		}
 	}
 	pub fn is_retval(&self) -> bool {
 		return self.fqn.len() != 0;
@@ -654,7 +653,6 @@ mod test {
 		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		let it = Source::free("item", &intg, "", &generators);
 		let cpy = it.clone();
-		use std::ops::Deref;
-		assert_eq!(cpy.borrow().deref().name, it.borrow().deref().name);
+		assert_eq!(cpy.name, it.name);
 	}
 }
