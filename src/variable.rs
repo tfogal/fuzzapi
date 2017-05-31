@@ -14,7 +14,6 @@ pub struct Source {
 	name: String,
 	pub generator: Box<Generator>,
 	pub ty: Type,
-	fqn: String,
 }
 
 // We need a special impl because of the Box for the generator.
@@ -24,8 +23,7 @@ pub struct Source {
 impl Clone for Source {
 	fn clone(&self) -> Self {
 		Source{name: self.name.clone(), generator: self.generator.clone(),
-		       ty: self.ty.clone(),
-		       fqn: self.fqn.clone()}
+		       ty: self.ty.clone()}
 	}
 
 	#[allow(unused_variables)]
@@ -50,33 +48,30 @@ impl Source {
 		};
 		Source{
 			name: nm.to_string(), generator: g,
-			ty: typ.clone(), fqn: "".to_string(),
+			ty: typ.clone(),
 		}
 	}
 
 	pub fn is_free(&self) -> bool {
-		// Both free and return variables have names; but free variables won't have
-		// an associated function.
-		return self.name.len() != 0 && self.fqn.len() == 0;
+		return self.name.len() != 0
 	}
 
-	pub fn retval(name: &str, fqn: &str) -> Source {
+	pub fn retval(name: &str) -> Source {
 		println!("WARNING: using broken retval type");
 		Source{
 			name: name.to_string(), generator: Box::new(GenNothing{}),
 			ty: Type::Builtin(Native::U8), /* FIXME broken */
-			fqn: fqn.to_string(),
 		}
 	}
 	pub fn is_retval(&self) -> bool {
-		return self.fqn.len() != 0;
+		false
 	}
 }
 
 impl Name for Source {
 	fn name(&self) -> String {
 		if self.is_free() { return self.name.clone(); }
-		if self.is_retval() { return self.fqn.clone(); }
+		if self.is_retval() { return "?retval-for-fqn?".to_string(); }
 		println!("invalid source: {:?}", self);
 		unreachable!();
 	}

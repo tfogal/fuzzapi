@@ -161,7 +161,7 @@ LExpr: stmt::Expression = {
 		for a in args {
 			arglist.push(function::Argument::newexpr(&fauxtype, &a));
 		}
-		let v = variable::Source::retval("???rvname???", &id);
+		let v = variable::Source::retval("???rvname???");
 		let rettype = function::ReturnType::new(&fauxtype, v);
 		let fqn = function::Function::new(&id, &rettype, &arglist);
 		stmt::Expression::FqnCall(fqn)
