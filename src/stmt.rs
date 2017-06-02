@@ -14,6 +14,7 @@ pub trait Code {
 
 #[derive(Clone,Debug)]
 pub enum Expression {
+	SimpleSym(variable::ScalarOp, Symbol),
 	Simple(variable::ScalarOp, variable::Source),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
@@ -27,6 +28,14 @@ pub enum Expression {
 impl Expression {
 	pub fn extype(&self) -> Type {
 		match self {
+			&Expression::SimpleSym(ref op, ref src) => {
+				match op {
+					&variable::ScalarOp::Null => src.typ.clone(),
+					&variable::ScalarOp::Deref => src.typ.dereference(),
+					&variable::ScalarOp::AddressOf =>
+						Type::Pointer(Box::new(src.typ.clone())),
+				}
+			},
 			&Expression::Simple(ref op, ref src) => {
 				match op {
 					&variable::ScalarOp::Null => src.ty.clone(),
@@ -56,6 +65,9 @@ impl Code for Expression {
 	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
 		-> Result<(),Error> {
 		match self {
+			&Expression::SimpleSym(ref op, ref src) => {
+				write!(strm, "{}{}", op.to_string(), src.name)
+			},
 			&Expression::Simple(ref op, ref src) => {
 				if src.is_free() {
 					try!(write!(strm, "{}{}", op.to_string(), src.name()));
@@ -139,56 +151,70 @@ mod test {
 		)
 	}
 
+	macro_rules! vardecl {
+		($vname:expr, $vtype:expr) => (
+			Statement::VariableDeclaration($vname.to_string(), $vtype)
+		)
+	}
+
 	#[test]
 	fn simple_expr() {
-		let pgm = Program::new(&vec![], &vec![]);
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("varname", Type::Builtin(Native::I32)),
+			vardecl!("var2", Type::Builtin(Native::I32)),
+			vardecl!("var3", Type::Pointer(Box::new(Type::Builtin(Native::I32)))),
+		]);
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		pgm.set_generators(&g);
+		pgm.analyze().unwrap();
+
 		let null = variable::ScalarOp::Null;
-		let src = variable::Source::free("varname", &Type::Builtin(Native::I32),
-		                                 "", &g);
-		let expr = Expression::Simple(null, src);
+		let varname = pgm.symlookup("varname").unwrap();
+		let expr = Expression::SimpleSym(null, varname.clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
 		cg_expect!(expr, "varname", pgm);
 		drop(expr);
 
 		// make sure address of affects codegen.
 		let addrof = variable::ScalarOp::AddressOf;
-		let v2 = variable::Source::free("var2", &Type::Builtin(Native::I32), "",&g);
-		let expr = Expression::Simple(addrof, v2);
+		let v2 = pgm.symlookup("var2").unwrap();
+		let expr = Expression::SimpleSym(addrof, v2.clone());
 		cg_expect!(expr, "&var2", pgm);
 		drop(expr);
 
 		// make sure deref affects codegen.
 		let addrof = variable::ScalarOp::Deref;
-		let ptr = Type::Pointer(Box::new(Type::Builtin(Native::I32)));
-		let v3 = variable::Source::free("var3", &ptr, "", &g);
-		let expr = Expression::Simple(addrof, v3);
+		let v3 = pgm.symlookup("var3").unwrap();
+		let expr = Expression::SimpleSym(addrof, v3.clone());
 		cg_expect!(expr, "*var3", pgm);
 	}
 
 	macro_rules! compoundtest {
-		($left:expr, $op:expr, $right:expr, $gennedcode:expr) => (
-			let pgm = Program::new(&vec![], &vec![]);
+		($pgm:expr, $left:expr, $op:expr, $right:expr, $gennedcode:expr) => (
 			let cp_ = Expression::Compound($left.clone(), $op, $right.clone());
-			cg_expect!(cp_, $gennedcode, pgm);
+			cg_expect!(cp_, $gennedcode, $pgm);
 			drop(cp_);
 		)
 	}
 	#[test]
 	fn compound_expr() {
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let l = variable::Source::free("LHS", &Type::Builtin(Native::I32), "", &g);
-		let r = variable::Source::free("RHS", &Type::Builtin(Native::I32), "", &g);
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("LHS", Type::Builtin(Native::I32)),
+			vardecl!("RHS", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let l = pgm.symlookup("LHS").unwrap();
+		let r = pgm.symlookup("RHS").unwrap();
 		let null = variable::ScalarOp::Null;
-		let el = Box::new(Expression::Simple(null, l));
-		let er = Box::new(Expression::Simple(null, r));
-		compoundtest!(el, Opcode::Add, er, "LHS + RHS");
-		compoundtest!(el, Opcode::Sub, er, "LHS - RHS");
-		compoundtest!(el, Opcode::Mul, er, "LHS * RHS");
-		compoundtest!(el, Opcode::Div, er, "LHS / RHS");
-		compoundtest!(el, Opcode::Mod, er, "LHS % RHS");
-		compoundtest!(el, Opcode::LAnd, er, "LHS && RHS");
-		compoundtest!(el, Opcode::LOr, er, "LHS || RHS");
+		let el = Box::new(Expression::SimpleSym(null, l.clone()));
+		let er = Box::new(Expression::SimpleSym(null, r.clone()));
+		compoundtest!(pgm, el, Opcode::Add, er, "LHS + RHS");
+		compoundtest!(pgm, el, Opcode::Sub, er, "LHS - RHS");
+		compoundtest!(pgm, el, Opcode::Mul, er, "LHS * RHS");
+		compoundtest!(pgm, el, Opcode::Div, er, "LHS / RHS");
+		compoundtest!(pgm, el, Opcode::Mod, er, "LHS % RHS");
+		compoundtest!(pgm, el, Opcode::LAnd, er, "LHS && RHS");
+		compoundtest!(pgm, el, Opcode::LOr, er, "LHS || RHS");
 	}
 
 	#[test]
@@ -221,19 +247,22 @@ mod test {
 
 	#[test]
 	fn expr_statement() {
-		let pgm = Program::new(&vec![], &vec![]);
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("a", Type::Builtin(Native::I32)),
+			vardecl!("b", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
 
 		let null = variable::ScalarOp::Null;
-		let src = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
-		let expr = Expression::Simple(null, src.clone());
+		let src = pgm.symlookup("a").unwrap();
+		let expr = Expression::SimpleSym(null, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "a;", pgm);
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
-		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
-		let expr = Expression::Simple(drf, src.clone());
+		let src = pgm.symlookup("b").unwrap();
+		let expr = Expression::SimpleSym(drf, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "*b;", pgm);
 		drop(sstmt); drop(src);
@@ -241,24 +270,29 @@ mod test {
 
 	#[test]
 	fn assignment_stmt() {
-		let pgm = Program::new(&vec![], &vec![]);
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let dst = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
-		let src = variable::Source::free("b", &Type::Builtin(Native::I32), "", &g);
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("a", Type::Builtin(Native::I32)),
+			vardecl!("b", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let dst = pgm.symlookup("a").unwrap();
+		let src = pgm.symlookup("b").unwrap();
 		let null = variable::ScalarOp::Null;
-		let srcexp = Expression::Simple(null, src);
-		let dstexp = Expression::Simple(null, dst);
+		let srcexp = Expression::SimpleSym(null, src.clone());
+		let dstexp = Expression::SimpleSym(null, dst.clone());
 		let sstmt = Statement::Assignment(dstexp, srcexp);
 		cg_expect!(sstmt, "a = b;", pgm);
 	}
 
 	#[test]
 	fn verify_stmt() {
-		let pgm = Program::new(&vec![], &vec![]);
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let vara = variable::Source::free("a", &Type::Builtin(Native::I32), "", &g);
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("a", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let vara = pgm.symlookup("a").unwrap();
 		let null = variable::ScalarOp::Null;
-		let expr = Expression::Simple(null, vara);
+		let expr = Expression::SimpleSym(null, vara.clone());
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
 	}

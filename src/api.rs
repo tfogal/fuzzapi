@@ -74,6 +74,17 @@ impl PartialEq for Symbol {
 	}
 }
 impl Eq for Symbol {}
+impl Clone for Symbol {
+	fn clone(&self) -> Self {
+		Symbol{name: self.name.clone(), generator: self.generator.clone(),
+		       typ: self.typ.clone()}
+	}
+
+	#[allow(unused_variables)]
+	fn clone_from(&mut self, src: &Self) {
+		unimplemented!();
+	}
+}
 
 #[derive(Debug)]
 pub struct Program {
@@ -133,6 +144,17 @@ impl Program {
 				Declaration::UDT(_) => (),
 			}
 		}
+		use stmt::Statement;
+		for ref stmt in self.statements.iter() {
+			match **stmt {
+				Statement::VariableDeclaration(ref nm, ref ty) => {
+					let gen = self.genlookup(ty, "").unwrap();
+					let sym = Symbol{name: nm.clone(), generator: gen, typ: ty.clone()};
+					self.symtab.push(sym);
+				},
+				_ => (),
+			};
+		}
 	}
 
 	// Ensures there is a type for every declaration.
@@ -145,7 +167,16 @@ impl Program {
 				},
 				Declaration::Free(_) => (),
 				Declaration::Function(_) => (),
-			}
+			};
+		}
+		use stmt::Statement;
+		for ref stmt in self.statements.iter() {
+			match **stmt {
+				Statement::VariableDeclaration(_, ref typ) => {
+					self.typetab.push(typ.clone());
+				},
+				_ => (),
+			};
 		}
 	}
 
@@ -156,18 +187,6 @@ impl Program {
 	// We should really just fix our parser to generate Declaration Statements in
 	// the first place...
 	fn insert_declarations(&mut self) {
-		// first a quick error check. this method converts declarations into
-		// statements. thus it should only be called once, else you'll end up with
-		// duplicate declarations. Make sure there are no VarDecls in our target.
-		for stmt in self.statements.iter() {
-			match stmt {
-				&stmt::Statement::VariableDeclaration(ref nm, ref typ) => {
-					panic!("VarDecl for {:?}:{:?} already in statements!", nm, typ);
-				},
-				_ => (),
-			};
-		}
-
 		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.symtab.len());
 		for var in self.symtab.iter() {
 			let s = stmt::Statement::VariableDeclaration(var.name.clone(),
