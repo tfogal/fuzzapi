@@ -11,7 +11,7 @@ pub struct Argument {
 	pub expr: stmt::Expression,
 }
 impl Argument {
-	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
+	pub fn new(t: &Type, expression: &stmt::Expression) -> Self {
 		Argument{ty: t.clone(), expr: expression.clone()}
 	}
 
