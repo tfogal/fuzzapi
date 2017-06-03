@@ -29,7 +29,7 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 		tryp!(write!(strm, "{}(", fqn.name));
 		for (a, arg) in fqn.arguments.iter().enumerate() {
 			match arg.expr {
-				stmt::Expression::SimpleSym(_, ref sym) => {
+				stmt::Expression::Basic(_, ref sym) => {
 					tryp!(write!(strm, "{:?}", sym.generator));
 				},
 				_ => (),

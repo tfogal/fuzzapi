@@ -213,7 +213,7 @@ impl Program {
 		match expr {
 			Expr::VarRef(ref sop, ref nm) => {
 				let v = self.symlookup(nm).unwrap();
-				stmt::Expression::SimpleSym(*sop, v.clone())
+				stmt::Expression::Basic(*sop, v.clone())
 			},
 			Expr::Call(ref nm, ref arglist) => {
 				let mut args: Vec<function::Argument> = Vec::new();

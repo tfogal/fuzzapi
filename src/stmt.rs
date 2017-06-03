@@ -14,7 +14,7 @@ pub trait Code {
 
 #[derive(Clone,Debug)]
 pub enum Expression {
-	SimpleSym(variable::ScalarOp, Symbol),
+	Basic(variable::ScalarOp, Symbol),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
 	// of statements.  Then any expression, no matter how trivial, is a
@@ -27,7 +27,7 @@ pub enum Expression {
 impl Expression {
 	pub fn extype(&self) -> Type {
 		match self {
-			&Expression::SimpleSym(ref op, ref src) => {
+			&Expression::Basic(ref op, ref src) => {
 				match op {
 					&variable::ScalarOp::Null => src.typ.clone(),
 					&variable::ScalarOp::Deref => src.typ.dereference(),
@@ -56,7 +56,7 @@ impl Code for Expression {
 	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
 		-> Result<(),Error> {
 		match self {
-			&Expression::SimpleSym(ref op, ref src) => {
+			&Expression::Basic(ref op, ref src) => {
 				write!(strm, "{}{}", op.to_string(), src.name)
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
@@ -153,7 +153,7 @@ mod test {
 
 		let null = variable::ScalarOp::Null;
 		let varname = pgm.symlookup("varname").unwrap();
-		let expr = Expression::SimpleSym(null, varname.clone());
+		let expr = Expression::Basic(null, varname.clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
 		cg_expect!(expr, "varname", pgm);
 		drop(expr);
@@ -161,14 +161,14 @@ mod test {
 		// make sure address of affects codegen.
 		let addrof = variable::ScalarOp::AddressOf;
 		let v2 = pgm.symlookup("var2").unwrap();
-		let expr = Expression::SimpleSym(addrof, v2.clone());
+		let expr = Expression::Basic(addrof, v2.clone());
 		cg_expect!(expr, "&var2", pgm);
 		drop(expr);
 
 		// make sure deref affects codegen.
 		let addrof = variable::ScalarOp::Deref;
 		let v3 = pgm.symlookup("var3").unwrap();
-		let expr = Expression::SimpleSym(addrof, v3.clone());
+		let expr = Expression::Basic(addrof, v3.clone());
 		cg_expect!(expr, "*var3", pgm);
 	}
 
@@ -189,8 +189,8 @@ mod test {
 		let l = pgm.symlookup("LHS").unwrap();
 		let r = pgm.symlookup("RHS").unwrap();
 		let null = variable::ScalarOp::Null;
-		let el = Box::new(Expression::SimpleSym(null, l.clone()));
-		let er = Box::new(Expression::SimpleSym(null, r.clone()));
+		let el = Box::new(Expression::Basic(null, l.clone()));
+		let er = Box::new(Expression::Basic(null, r.clone()));
 		compoundtest!(pgm, el, Opcode::Add, er, "LHS + RHS");
 		compoundtest!(pgm, el, Opcode::Sub, er, "LHS - RHS");
 		compoundtest!(pgm, el, Opcode::Mul, er, "LHS * RHS");
@@ -210,9 +210,9 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 		let null = variable::ScalarOp::Null;
-		let va = Expression::SimpleSym(null, pgm.symlookup("Va").unwrap().clone());
-		let vb = Expression::SimpleSym(null, pgm.symlookup("Vb").unwrap().clone());
-		let fvar = Expression::SimpleSym(null, pgm.symlookup("Fv").unwrap().clone());
+		let va = Expression::Basic(null, pgm.symlookup("Va").unwrap().clone());
+		let vb = Expression::Basic(null, pgm.symlookup("Vb").unwrap().clone());
+		let fvar = Expression::Basic(null, pgm.symlookup("Fv").unwrap().clone());
 
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
 		// fixme: no Source!
@@ -248,14 +248,14 @@ mod test {
 
 		let null = variable::ScalarOp::Null;
 		let src = pgm.symlookup("a").unwrap();
-		let expr = Expression::SimpleSym(null, src.clone());
+		let expr = Expression::Basic(null, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "a;", pgm);
 		drop(sstmt); drop(src);
 
 		let drf = variable::ScalarOp::Deref;
 		let src = pgm.symlookup("b").unwrap();
-		let expr = Expression::SimpleSym(drf, src.clone());
+		let expr = Expression::Basic(drf, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "*b;", pgm);
 		drop(sstmt); drop(src);
@@ -271,8 +271,8 @@ mod test {
 		let dst = pgm.symlookup("a").unwrap();
 		let src = pgm.symlookup("b").unwrap();
 		let null = variable::ScalarOp::Null;
-		let srcexp = Expression::SimpleSym(null, src.clone());
-		let dstexp = Expression::SimpleSym(null, dst.clone());
+		let srcexp = Expression::Basic(null, src.clone());
+		let dstexp = Expression::Basic(null, dst.clone());
 		let sstmt = Statement::Assignment(dstexp, srcexp);
 		cg_expect!(sstmt, "a = b;", pgm);
 	}
@@ -285,7 +285,7 @@ mod test {
 		pgm.analyze().unwrap();
 		let vara = pgm.symlookup("a").unwrap();
 		let null = variable::ScalarOp::Null;
-		let expr = Expression::SimpleSym(null, vara.clone());
+		let expr = Expression::Basic(null, vara.clone());
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
 	}
