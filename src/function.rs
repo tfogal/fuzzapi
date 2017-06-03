@@ -11,8 +11,8 @@ pub struct Argument {
 	pub expr: stmt::Expression,
 }
 impl Argument {
-	pub fn new(t: &Type, expression: &stmt::Expression) -> Self {
-		Argument{ty: t.clone(), expr: expression.clone()}
+	pub fn new(expression: &stmt::Expression) -> Self {
+		Argument{ty: expression.extype(), expr: expression.clone()}
 	}
 
 	pub fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)

@@ -220,8 +220,7 @@ impl Program {
 				for a in arglist.iter() {
 					use std::ops::Deref;
 					let ex = self.expr_to_expr(a.deref().clone());
-					let ty = ex.extype();
-					args.push(function::Argument::new(&ty, &ex));
+					args.push(function::Argument::new(&ex));
 				}
 				println!("FIXME: miserable return type setup for fqn call");
 				let fauxtype = Type::Builtin(Native::Integer);

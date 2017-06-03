@@ -226,14 +226,14 @@ mod test {
 		drop(fexpr);
 
 		// make sure it codegen's single argument...
-		let arg = Argument::new(&Type::Builtin(Native::I32), &fvar);
+		let arg = Argument::new(&fvar);
 		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
 		cg_expect!(fqn, "g(Fv)", pgm);
 		drop(fqn);
 
 		// .. and that it puts commas if there's an arglist...
-		let a0 = Argument::new(&Type::Builtin(Native::I32), &va);
-		let a1 = Argument::new(&Type::Builtin(Native::I32), &vb);
+		let a0 = Argument::new(&va);
+		let a1 = Argument::new(&vb);
 		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
 		cg_expect!(fqn, "h(Va, Vb)", pgm);
 	}
