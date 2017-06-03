@@ -11,11 +11,6 @@ pub struct Argument {
 	pub expr: stmt::Expression,
 }
 impl Argument {
-	pub fn new(t: &Type, s: Source) -> Self {
-		use variable;
-		let exp = stmt::Expression::Simple(variable::ScalarOp::Null, s);
-		Argument{ty: t.clone(), expr: exp}
-	}
 	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
 		Argument{ty: t.clone(), expr: expression.clone()}
 	}
@@ -33,6 +28,7 @@ pub struct ReturnType {
 	pub src: Source,
 }
 impl ReturnType {
+	// fixme: no Source!
 	pub fn new(t: &Type, s: Source) -> Self {
 		ReturnType{ty: t.clone(), src: s}
 	}

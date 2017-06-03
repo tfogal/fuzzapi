@@ -15,7 +15,6 @@ pub trait Code {
 #[derive(Clone,Debug)]
 pub enum Expression {
 	SimpleSym(variable::ScalarOp, Symbol),
-	Simple(variable::ScalarOp, variable::Source),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
 	// of statements.  Then any expression, no matter how trivial, is a
@@ -36,14 +35,6 @@ impl Expression {
 						Type::Pointer(Box::new(src.typ.clone())),
 				}
 			},
-			&Expression::Simple(ref op, ref src) => {
-				match op {
-					&variable::ScalarOp::Null => src.ty.clone(),
-					&variable::ScalarOp::Deref => src.ty.dereference(),
-					&variable::ScalarOp::AddressOf =>
-						Type::Pointer(Box::new(src.ty.clone())),
-				}
-			}
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				let l = lhs.extype();
 				let r = rhs.extype();
@@ -67,17 +58,6 @@ impl Code for Expression {
 		match self {
 			&Expression::SimpleSym(ref op, ref src) => {
 				write!(strm, "{}{}", op.to_string(), src.name)
-			},
-			&Expression::Simple(ref op, ref src) => {
-				if src.is_free() {
-					try!(write!(strm, "{}{}", op.to_string(), src.name()));
-				} else if src.is_retval() {
-					try!(write!(strm, "/*fixme, from ret!*/"));
-					unreachable!(); // right?
-				} else {
-					unreachable!();
-				}
-				Ok(())
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				try!(lhs.codegen(strm, program));
@@ -222,28 +202,38 @@ mod test {
 
 	#[test]
 	fn fqn_expr() {
-		let pgm = Program::new(&vec![], &vec![]);
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("rv", Type::Builtin(Native::I32)),
+			vardecl!("Fv", Type::Builtin(Native::I32)),
+			vardecl!("Va", Type::Builtin(Native::I32)),
+			vardecl!("Vb", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let null = variable::ScalarOp::Null;
+		let va = Expression::SimpleSym(null, pgm.symlookup("Va").unwrap().clone());
+		let vb = Expression::SimpleSym(null, pgm.symlookup("Vb").unwrap().clone());
+		let fvar = Expression::SimpleSym(null, pgm.symlookup("Fv").unwrap().clone());
+
 		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
+		// fixme: no Source!
 		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), "", &g);
 		let rv = ReturnType::new(&Type::Builtin(Native::I32), r);
 		let fqn = Function::new("f", &rv, &vec![]);
 		let fexpr = Expression::FqnCall(fqn);
+
 		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
 		cg_expect!(fexpr, "f()", pgm);
 		drop(fexpr);
 
 		// make sure it codegen's single argument...
-		let fvar = variable::Source::free("Fv", &Type::Builtin(Native::I32), "",&g);
-		let arg = Argument::new(&Type::Builtin(Native::I32), fvar);
+		let arg = Argument::newexpr(&Type::Builtin(Native::I32), &fvar);
 		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
 		cg_expect!(fqn, "g(Fv)", pgm);
 		drop(fqn);
 
 		// .. and that it puts commas if there's an arglist...
-		let va = variable::Source::free("Va", &Type::Builtin(Native::I32), "", &g);
-		let vb = variable::Source::free("Vb", &Type::Builtin(Native::I32), "", &g);
-		let a0 = Argument::new(&Type::Builtin(Native::I32), va);
-		let a1 = Argument::new(&Type::Builtin(Native::I32), vb);
+		let a0 = Argument::newexpr(&Type::Builtin(Native::I32), &va);
+		let a1 = Argument::newexpr(&Type::Builtin(Native::I32), &vb);
 		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
 		cg_expect!(fqn, "h(Va, Vb)", pgm);
 	}

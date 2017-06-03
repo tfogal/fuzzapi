@@ -439,30 +439,11 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 	}
 }
 
-fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
-                  gen: &Vec<Box<variable::Generator>>) -> function::Function {
-	let rtype = type_from_decl(&fqn.retval, &types);
-	let fauxsrc = variable::Source::free("???", &rtype, "std:nothing", &gen);
-	let retv = function::ReturnType::new(&rtype, fauxsrc);
-	let mut rv = function::Function{
-		name: fqn.name.clone(),
-		arguments: Vec::new(),
-		retval: retv
-	};
-	for arg in fqn.arguments.iter() {
-		let typedecl: Type = type_from_decl(&arg, &types);
-		let src = variable::Source::free("???", &typedecl, "std:nothing", &gen);
-		rv.arguments.push(function::Argument::new(&typedecl, src));
-	}
-	return rv;
-}
-
 #[cfg(test)]
 mod test {
 	use api;
 	use fuzz;
 	use typ::{Native, Type};
-	use variable;
 
 	#[test]
 	fn empty_struct() {
@@ -667,21 +648,6 @@ mod test {
 			_ => panic!("non function type {:?}", decls[0]),
 		};
 		assert_eq!(fqn.name, "hcreate_r");
-	}
-
-	#[test]
-	fn func_from_decl() {
-		let declint = api::DeclType::Basic(Type::Builtin(Native::Integer));
-		let declszt = api::DeclType::Basic(Type::Builtin(Native::Usize));
-		let fd = api::FuncDecl{
-			name: "hcreate".to_string(),
-			retval: declint,
-			arguments: vec![declszt]
-		};
-		let generators: Vec<Box<variable::Generator>> =
-			vec![Box::new(variable::GenNothing{})];
-		let typelist: Vec<Type> = Vec::new();
-		api::func_from_decl(&fd, &typelist, &generators);
 	}
 
 	#[test]
