@@ -19,12 +19,6 @@ impl Argument {
 	pub fn newexpr(t: &Type, expression: &stmt::Expression) -> Self {
 		Argument{ty: t.clone(), expr: expression.clone()}
 	}
-	pub fn source(&self) -> Source {
-		match self.expr {
-			stmt::Expression::Simple(_, ref s) => s.clone(),
-			_ => unimplemented!(),
-		}
-	}
 
 	pub fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
 		-> Result<(),Error> {

@@ -28,11 +28,12 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 	for fqn in fqns {
 		tryp!(write!(strm, "{}(", fqn.name));
 		for (a, arg) in fqn.arguments.iter().enumerate() {
-			if arg.source().is_free() {
-				tryp!(write!(strm, "{:?}", arg.source().generator));
-			} else if arg.source().is_retval() {
-				tryp!(write!(strm, "(rv)"));
-			}
+			match arg.expr {
+				stmt::Expression::Simple(_, ref sym) => {
+					tryp!(write!(strm, "{:?}", sym.generator));
+				},
+				_ => (),
+			};
 			if a != fqn.arguments.len()-1 {
 				tryp!(write!(strm, ", "));
 			}
@@ -212,25 +213,6 @@ fn parse_generators(fname: &str) -> Vec<Box<variable::Generator>> {
 	tobox(stdgen)
 }
 
-fn parse_types(fname: &str, mut generators: &mut Vec<Box<variable::Generator>>)
-	-> Vec<Type> {
-	let p = Path::new(fname);
-	let mut fp = match File::open(&p) {
-		Err(e) => panic!("error reading {}: {}", fname, e),
-		Ok(f) => f,
-	};
-	let mut s = String::new();
-	use std::io::Read;
-	fp.read_to_string(&mut s).unwrap();
-	let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(&s) {
-		Err(e) => panic!("error parsing {}: {:?}", fname, e),
-		Ok(x) => x,
-	};
-
-	let (types, _) = api::resolve_types(&decls, &mut generators);
-	return types;
-}
-
 fn main() {
 	// todo: search path for hf files.
 	let mut generators = parse_generators("../share/stdgen.hf");
@@ -262,12 +244,12 @@ fn main() {
 		Ok(x) => x,
 	};
 	assert!(lprogram.declarations.len() > 1);
-	assert_eq!(lprogram.statements.len(), 2);
 	lprogram.set_generators(&generators);
 	match lprogram.analyze() {
 		Err(e) => panic!(e),
 		_ => (),
 	};
+	assert_eq!(lprogram.statements.len(), 7);
 
 	while !lprogram.done() {
 		match compile_and_test_program(&lprogram) {
@@ -302,6 +284,7 @@ mod test {
 	}
 
 	// dumps WHAT into the file named TO.  panics on any errors.
+	#[allow(dead_code)]
 	fn dump(to: &str, what: &str) {
 		let p = Path::new(to);
 		let mut fp: File = match File::create(to) {
@@ -368,6 +351,7 @@ mod test {
 			Err(e) => panic!(e),
 			_ => (),
 		};
+		println!("program: {:?}", lprogram);
 		assert_eq!(lprogram.statements.len(), 3);
 		lprogram.set_generators(&generators_for_test());
 
@@ -384,12 +368,12 @@ mod test {
 			Ok(x) => x,
 		};
 		assert!(lprogram.declarations.len() > 1);
-		assert_eq!(lprogram.statements.len(), 2);
+		lprogram.set_generators(&generators_for_test());
 		match lprogram.analyze() {
 			Err(e) => panic!(e),
 			_ => (),
 		};
-		lprogram.set_generators(&generators_for_test());
+		assert_eq!(lprogram.statements.len(), 7);
 		assert_eq!(lprogram.n_states(), 256);
 	}
 
@@ -403,21 +387,10 @@ mod test {
 			"function:new hsearch_r int {\n" +
 				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 			"}";
-		let fname = ".parse_hash_decls_tmp";
-		dump(fname, &s);
-
-		let mut generators: Vec<Box<variable::Generator>> =
-			vec![Box::new(variable::GenNothing{})];
-		let types = parse_types(fname, &mut generators);
-		match std::fs::remove_file(fname) {
-			Err(e) => panic!("error removing {:?}: {}", fname, e),
-			_ => (),
+		match fuzz::parse_LProgram(s.as_str()) {
+			Err(e) => panic!("{:?}", e),
+			Ok(x) => x,
 		};
-		assert_eq!(types.len(), 3);
-		for t in types {
-			println!("\t{:?}", t);
-		}
-		// todo: should assert properties of those types
 	}
 
 	#[test]
@@ -428,11 +401,11 @@ mod test {
 			Ok(x) => x,
 		};
 		assert!(lprogram.declarations.len() > 1);
-		assert_eq!(lprogram.statements.len(), 2);
 		match lprogram.analyze() {
 			Err(e) => panic!(e),
 			_ => (),
 		};
+		assert_eq!(lprogram.statements.len(), 7);
 		let hdrs: Vec<&str> = vec!["stdlib.h", "search.h"];
 		let mut strm: Vec<u8> = Vec::new();
 		match lprogram.prologue(&mut strm, &hdrs) {

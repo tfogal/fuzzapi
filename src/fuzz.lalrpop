@@ -1,7 +1,6 @@
 // Parsing grammar/code for the user's program abstraction.
 use api;
 use typ::{Native, Type};
-use stmt;
 use variable;
 
 grammar;
@@ -131,39 +130,26 @@ LTypeRef: api::DeclType = {
 	},
 };
 
-LStmt: stmt::Statement = {
-	<expr: LExpr> => stmt::Statement::Expr(expr),
+LStmt: api::Stmt = {
+	<expr: LExpr> => api::Stmt::Basic(expr),
 	<lhs: LExpr> "=" <rhs: LExpr> => {
-		stmt::Statement::Assignment(lhs, rhs)
+		api::Stmt::Assignment(lhs, rhs)
 	},
 };
 
-LExpr: stmt::Expression = {
+LExpr: api::Expr = {
 	<sop: LOperation> <id: LIdentifier> => {
-		use variable::{Generator, GenNothing, Source};
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
-		let s = stmt::Expression::Simple(sop, v);
-		s
+		api::Expr::VarRef(sop, id)
 	},
 	<id: LIdentifier> => {
-		use variable::{Generator, GenNothing, ScalarOp, Source};
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let v = Source::free(&id, &Type::Builtin(Native::Integer), "", &g);
-		let sop = ScalarOp::Null;
-		let s = stmt::Expression::Simple(sop, v);
-		s
+		let sop = variable::ScalarOp::Null;
+		api::Expr::VarRef(sop, id)
 	},
 	"function:call" <id: LIdentifier> "{" <args: LExpr*> "}" => {
-		use function;
-		let fauxtype = Type::Builtin(Native::Integer);
-		let mut arglist: Vec<function::Argument> = Vec::new();
-		for a in args {
-			arglist.push(function::Argument::newexpr(&fauxtype, &a));
+		let mut arglist: Vec<Box<api::Expr>> = Vec::new();
+		for a in args.iter() {
+			arglist.push(Box::new(a.clone()));
 		}
-		let v = variable::Source::retval("???rvname???");
-		let rettype = function::ReturnType::new(&fauxtype, v);
-		let fqn = function::Function::new(&id, &rettype, &arglist);
-		stmt::Expression::FqnCall(fqn)
+		api::Expr::Call(id, arglist)
 	},
 };

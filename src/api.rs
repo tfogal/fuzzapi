@@ -62,6 +62,19 @@ pub enum Declaration {
 	UDT(DeclType), // Error if the DeclType is not a Struct || Enum!
 }
 
+#[derive(Clone, Debug)]
+pub enum Expr {
+	VarRef(variable::ScalarOp, String /* varname */),
+	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
+}
+#[derive(Clone, Debug)]
+pub enum Stmt {
+	Basic(Expr),
+	VarDecl(FreeVarDecl),
+	Assignment(Expr /* LHS */, Expr /* RHS */),
+	Verify(Expr),
+}
+
 #[derive(Debug)]
 pub struct Symbol {
 	pub name: String,
@@ -86,9 +99,20 @@ impl Clone for Symbol {
 	}
 }
 
+// Program object, represents the state of the abstract program given to us by
+// the user.
 #[derive(Debug)]
 pub struct Program {
 	pub declarations: Vec<Declaration>,
+	// The AST is what we parsed out from the user.  Essentially everything is
+	// referenced via a string.  Yes, technically it isn't a tree, but that's
+	// because enums/matches in Rust get us all the branching we need.
+	ast: Vec<Stmt>,
+	// The statements are something we can actually codegen from.  The client
+	// should not write into this: rather, the client creates the AST, and as we
+	// resolve entries from the AST to actual objects (i.e. references to a
+	// Symbol in self.symtab instead of a string variable name), we will insert
+	// those objects into 'statements'.
 	pub statements: Vec<stmt::Statement>,
 	symtab: Vec<Symbol>,
 	typetab: Vec<Type>,
@@ -98,9 +122,10 @@ pub struct Program {
 }
 
 impl Program {
-	pub fn new(decls: &Vec<Declaration>, stmts: &Vec<stmt::Statement>)
+	pub fn new(decls: &Vec<Declaration>, stmts: &Vec<Stmt>)
 		-> Program {
-		Program{declarations: (*decls).clone(), statements: (*stmts).clone(),
+		Program{declarations: (*decls).clone(), statements: Vec::new(),
+		        ast: (*stmts).clone(),
 		        symtab: Vec::new(), typetab: Vec::new(), genlist: Vec::new()}
 	}
 
@@ -144,12 +169,13 @@ impl Program {
 				Declaration::UDT(_) => (),
 			}
 		}
-		use stmt::Statement;
-		for ref stmt in self.statements.iter() {
+		for ref stmt in self.ast.iter() {
 			match **stmt {
-				Statement::VariableDeclaration(ref nm, ref ty) => {
-					let gen = self.genlookup(ty, "").unwrap();
-					let sym = Symbol{name: nm.clone(), generator: gen, typ: ty.clone()};
+				Stmt::VarDecl(ref fvd) => {
+					let ty = type_from_decl(&fvd.ty, &self.typetab);
+					let gen = self.genlookup(&ty, &fvd.genname).unwrap();
+					let sym = Symbol{name: fvd.name.clone(), generator: gen,
+					                 typ: ty.clone()};
 					self.symtab.push(sym);
 				},
 				_ => (),
@@ -169,10 +195,10 @@ impl Program {
 				Declaration::Function(_) => (),
 			};
 		}
-		use stmt::Statement;
-		for ref stmt in self.statements.iter() {
+		for ref stmt in self.ast.iter() {
 			match **stmt {
-				Statement::VariableDeclaration(_, ref typ) => {
+				Stmt::VarDecl(ref fvd) => {
+					let typ = type_from_decl(&fvd.ty, &self.typetab);
 					self.typetab.push(typ.clone());
 				},
 				_ => (),
@@ -180,29 +206,97 @@ impl Program {
 		}
 	}
 
-	// Our parsing is a bit weird in that it generates both declarations and then
-	// a list of statements.  Undo the weirdness by converting all the
-	// declarations into VarDecl statements, so that we can then just codegen()
-	// all the statements without worrying it'll break stuff.
-	// We should really just fix our parser to generate Declaration Statements in
-	// the first place...
-	fn insert_declarations(&mut self) {
-		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.symtab.len());
+	// We have two types of expressions: "AST" expressions and stmt::Expressions.
+	// The former are string based; the latter reference symbols from our
+	// self.symtab.  This converts from the AST variation to the analyzed version.
+	fn expr_to_expr(&self, expr: Expr) -> stmt::Expression {
+		match expr {
+			Expr::VarRef(ref sop, ref nm) => {
+				let v = self.symlookup(nm).unwrap();
+				stmt::Expression::SimpleSym(*sop, v.clone())
+			},
+			Expr::Call(ref nm, ref arglist) => {
+				let mut args: Vec<function::Argument> = Vec::new();
+				for a in arglist.iter() {
+					use std::ops::Deref;
+					let ex = self.expr_to_expr(a.deref().clone());
+					let ty = ex.extype();
+					args.push(function::Argument::newexpr(&ty, &ex));
+				}
+				println!("FIXME: miserable return type setup for fqn call");
+				let fauxtype = Type::Builtin(Native::Integer);
+				let v = variable::Source::retval("???rvname???");
+				let rettype = function::ReturnType::new(&fauxtype, v);
+				let fqn = function::Function::new(&nm, &rettype, &args);
+				stmt::Expression::FqnCall(fqn)
+			},
+		}
+	}
+
+	// We have two kinds of statements: "AST" statements and stmt::Statements.
+	// The former is the unanalyzed result of the parser.  The latter is the
+	// post-analysis result that references our internal data structures.  This
+	// does the analysis to turn the former into the latter.
+	fn stmt_to_stmt(&self, s: Stmt) -> Option<stmt::Statement> {
+		match s {
+			Stmt::Basic(ref expr) => {
+				match *expr {
+					Expr::VarRef(ref op, ref nm) => {
+						println!("Statement with no effect: '{}{}'", op.to_string(), nm);
+						None
+					},
+					Expr::Call(_, _) => {
+						let exp = self.expr_to_expr(expr.clone());
+						Some(stmt::Statement::Expr(exp))
+					},
+				}
+			},
+			Stmt::VarDecl(ref fvd) => {
+				let sym = self.symlookup(&fvd.name).unwrap();
+				Some(stmt::Statement::VariableDeclaration(sym.name.clone(),
+				                                          sym.typ.clone()))
+			},
+			Stmt::Assignment(ref lhs, ref rhs) => {
+				let l = self.expr_to_expr(lhs.clone());
+				let r = self.expr_to_expr(rhs.clone());
+				Some(stmt::Statement::Assignment(l, r))
+			},
+			Stmt::Verify(ref expr) => {
+				Some(stmt::Statement::Verify(self.expr_to_expr(expr.clone())))
+			},
+		}
+	}
+
+	// Resolves references and the like in the AST.
+	// After, the AST list will be empty and our list of Statements will have
+	// everything we need.
+	// need.
+	fn ast_resolve(&mut self) {
+		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.ast.len());
 		for var in self.symtab.iter() {
 			let s = stmt::Statement::VariableDeclaration(var.name.clone(),
 			                                             var.typ.clone());
 			stmts.push(s);
 		}
+		for stmt in self.ast.iter() {
+			match self.stmt_to_stmt(stmt.clone()) {
+				None => (),
+				Some(s) => stmts.push(s),
+			};
+		}
 		// declarations need to come first, so we add the existing statements to
 		// what we just created instead of the other way around.
 		stmts.append(&mut self.statements);
 		self.statements = stmts;
+		// Clear our AST.  This makes sure we get odd behavior if we try to use
+		// this after analysis.
+		self.ast.clear();
 	}
 
 	pub fn analyze(&mut self) -> Result<(),String> {
 		self.populate_typetable();
 		self.populate_symtable();
-		self.insert_declarations();
+		self.ast_resolve();
 		self.genlist.clear();
 		Ok(())
 	}
@@ -363,58 +457,6 @@ fn func_from_decl(fqn: &FuncDecl, types: &Vec<Type>,
 	return rv;
 }
 
-// replaces the "Decl" types from this module with the typ::* counterparts,
-// potentially panic'ing due to invalid semantics.
-pub fn resolve_types(decls: &Vec<Declaration>,
-                     generators: &mut Vec<Box<variable::Generator>>) ->
-	(Vec<Type>, Vec<variable::Source>) {
-	assert!(decls.len() > 0);
-	let mut drv: Vec<Type> = Vec::new();
-	let mut vars: Vec<variable::Source> = Vec::new();
-
-	for decl in decls {
-		match decl {
-			&Declaration::Free(ref fr) => {
-				let gname: String = if fr.genname == "opaque" {
-					"std:opaque:".to_string() + &fr.ty.typename()
-				} else if fr.genname == "udt" || fr.genname == "UDT" {
-					"std:udt:".to_string() + &fr.ty.typename()
-				} else if fr.genname == "enum" || fr.genname == "Enum" {
-					"std:enum:".to_string() + &fr.ty.typename()
-				} else {
-					fr.genname.clone()
-				};
-				let typedecl: Type = type_from_decl(&fr.ty, &drv);
-				let fvar = variable::Source::free(&fr.name, &typedecl, &gname,
-				                                  generators);
-				vars.push(fvar);
-			},
-			&Declaration::Function(ref fqn) => {
-				let func = func_from_decl(fqn, &drv, generators);
-				drv.push(Type::Function(Box::new(func)));
-			},
-			&Declaration::UDT(ref udecl) => {
-				let typedecl: Type = type_from_decl(&udecl, &drv);
-				drv.push(typedecl.clone());
-				match udecl {
-					&DeclType::Struct(ref x, _) => {
-						let opaque = variable::GenOpaque::create(&typedecl);
-						generators.push(Box::new(opaque));
-						x
-					},
-					&DeclType::Enum(ref x, _) => {
-						let genenum = variable::GenEnum::create(&typedecl);
-						generators.push(Box::new(genenum));
-						x
-					},
-					_ => panic!("invalid DeclType {:?} for UDT", udecl),
-				};
-			},
-		};
-	}
-	(drv, vec![])
-}
-
 #[cfg(test)]
 mod test {
 	use api;
@@ -443,10 +485,6 @@ mod test {
 				assert_eq!(decllist.len(), 0)
 			},
 		};
-		let mut gens: Vec<Box<variable::Generator>> = Vec::new();
-		let (decl, _) =
-			api::resolve_types(&fuzz::parse_LDeclarations(s).unwrap(), &mut gens);
-		assert_eq!(decl.len(), 1);
 	}
 
 	#[test]
@@ -647,25 +685,6 @@ mod test {
 	}
 
 	#[test]
-	fn type_resolution() {
-		let s = "struct Entry {\n".to_string() +
-			"pointer char key;\n" +
-			"pointer void value;\n" +
-		"}\n" +
-		"var:free tbl gen:opaque struct Entry";
-		let decls: Vec<api::Declaration> =
-			match fuzz::parse_LDeclarations(s.as_str()) {
-			Ok(parsed) => parsed,
-			Err(e) => panic!("{:?}", e),
-		};
-		let mut generators: Vec<Box<variable::Generator>> =
-			vec![Box::new(variable::GenNothing{})];
-		let (types, srcs) = api::resolve_types(&decls, &mut generators);
-		assert_eq!(types.len(), 1);
-		assert_eq!(srcs.len(), 0);
-	}
-
-	#[test]
 	fn opaque_struct_in_function() {
 		let s = "struct hsearch_data {}\n".to_string() +
 		"var:free tbl gen:opaque struct hsearch_data\n" +
@@ -678,36 +697,6 @@ mod test {
 			Err(e) => panic!("{:?}", e),
 		};
 		assert_eq!(decls.len(), 3);
-		let mut generators: Vec<Box<variable::Generator>> =
-			vec![Box::new(variable::GenNothing{})];
-		let (types, _) = api::resolve_types(&decls, &mut generators);
-		assert_eq!(generators.len(), 2);
-		match types[0] {
-			Type::Struct(ref nm, ref fields) => {
-				assert_eq!(nm, "hsearch_data");
-				assert_eq!(fields.len(), 0);
-			}
-			_ => panic!("first type ({:?}) should be struct hsearch_data", types[0]),
-		};
 		// should assert that the hcreate_r's 2nd arg == types[0].
-	}
-
-	#[test]
-	fn enum_resolves_with_generator() {
-		let s = "enum ACTION { ENTER=0, FIND=1, }\n";
-		let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(s) {
-			Ok(parsed) => parsed,
-			Err(e) => panic!("{:?}", e),
-		};
-		assert_eq!(decls.len(), 1);
-		let mut generators: Vec<Box<variable::Generator>> =
-			vec![Box::new(variable::GenNothing{})];
-		let (types, _) = api::resolve_types(&decls, &mut generators);
-		assert_eq!(generators.len(), 2);
-		assert_eq!(types.len(), 1);
-		match types[0] {
-			Type::Enum(ref enm, _) => assert_eq!(enm, "ACTION"),
-			_ => (),
-		};
 	}
 }

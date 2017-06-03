@@ -152,9 +152,12 @@ mod test {
 	}
 
 	macro_rules! vardecl {
-		($vname:expr, $vtype:expr) => (
-			Statement::VariableDeclaration($vname.to_string(), $vtype)
-		)
+		($vname:expr, $vtype:expr) => ({
+			let dt = DeclType::Basic($vtype);
+			let fvd = FreeVarDecl{name: $vname.to_string(),
+			                      genname: "".to_string(), ty: dt};
+			Stmt::VarDecl(fvd)
+		})
 	}
 
 	#[test]
