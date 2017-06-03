@@ -9,7 +9,7 @@ today.  Haskell's QuickCheck is good:
 
   https://wiki.haskell.org/Introduction_to_QuickCheck1
 
-but few of developers live in that world.
+but few developers live in that world.
 
 HF allows one to write an "abstract" test program along with a set of
 'Generators'.  The Generators produce one of any number of values and
