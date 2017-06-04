@@ -223,9 +223,7 @@ impl Program {
 					args.push(function::Argument::new(&ex));
 				}
 				println!("FIXME: miserable return type setup for fqn call");
-				let fauxtype = Type::Builtin(Native::Integer);
-				let v = variable::Source::retval("???rvname???");
-				let rettype = function::ReturnType::new(&fauxtype, v);
+				let rettype = Type::Builtin(Native::Integer);
 				let fqn = function::Function::new(&nm, &rettype, &args);
 				stmt::Expression::FqnCall(fqn)
 			},

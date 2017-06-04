@@ -41,7 +41,7 @@ impl Expression {
 				op.result_type(l, r)
 			},
 			&Expression::FqnCall(ref fqn) => {
-				fqn.retval.ty.clone()
+				fqn.retval.clone()
 			},
 		}
 	}
@@ -214,11 +214,8 @@ mod test {
 		let vb = Expression::Basic(null, pgm.symlookup("Vb").unwrap().clone());
 		let fvar = Expression::Basic(null, pgm.symlookup("Fv").unwrap().clone());
 
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		// fixme: no Source!
-		let r = variable::Source::free("rv", &Type::Builtin(Native::I32), "", &g);
-		let rv = ReturnType::new(&Type::Builtin(Native::I32), r);
-		let fqn = Function::new("f", &rv, &vec![]);
+		let rtype = Type::Builtin(Native::I32);
+		let fqn = Function::new("f", &rtype, &vec![]);
 		let fexpr = Expression::FqnCall(fqn);
 
 		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
@@ -227,14 +224,14 @@ mod test {
 
 		// make sure it codegen's single argument...
 		let arg = Argument::new(&fvar);
-		let fqn = Expression::FqnCall(Function::new("g", &rv, &vec![arg]));
+		let fqn = Expression::FqnCall(Function::new("g", &rtype, &vec![arg]));
 		cg_expect!(fqn, "g(Fv)", pgm);
 		drop(fqn);
 
 		// .. and that it puts commas if there's an arglist...
 		let a0 = Argument::new(&va);
 		let a1 = Argument::new(&vb);
-		let fqn = Expression::FqnCall(Function::new("h", &rv, &vec![a0, a1]));
+		let fqn = Expression::FqnCall(Function::new("h", &rtype, &vec![a0, a1]));
 		cg_expect!(fqn, "h(Va, Vb)", pgm);
 	}
 

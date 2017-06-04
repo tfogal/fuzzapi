@@ -1,5 +1,4 @@
-// This holds information about a variable is used in an API.  Briefly:
-//   Source: where the variable comes from / how it is generated
+// This holds information about a variable is used in the API.  Briefly:
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
@@ -7,75 +6,6 @@ extern crate rand;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
 use tc::*;
-
-#[derive(Debug)]
-// todo/fixme: kill this and use api::Symbol everywhere instead.
-pub struct Source {
-	name: String,
-	pub generator: Box<Generator>,
-	pub ty: Type,
-}
-
-// We need a special impl because of the Box for the generator.
-// Duplicating the generator is fine and probably what we want.  If we are
-// cloning a Source, we probably want that to be distinct, and thus we would
-// not want it to share the generator anyway.
-impl Clone for Source {
-	fn clone(&self) -> Self {
-		Source{name: self.name.clone(), generator: self.generator.clone(),
-		       ty: self.ty.clone()}
-	}
-
-	#[allow(unused_variables)]
-	fn clone_from(&mut self, src: &Self) {
-		unimplemented!();
-	}
-}
-
-// todo fixme: the creation functions on Source should not create an
-// Rc<RefCell<Source>>.  The fact that there's an Rc<> for these should be
-// transparent to the user; we should somehow hide this aspect of the data
-// structure, potentially by using a higher-level data structure.
-impl Source {
-	// Construct a free variable of the given type, using the given generator.
-	// The generator can be the null string to search for a default one.
-	pub fn free(nm: &str, typ: &Type, gen: &str, list: &Vec<Box<Generator>>) ->
-		Source {
-		let g: Box<Generator> = match generator_list(gen, &list) {
-			Some(x) => x,
-			// if we can't find an appropriate generator, try to auto-create one.
-			None => generator(typ),
-		};
-		Source{
-			name: nm.to_string(), generator: g,
-			ty: typ.clone(),
-		}
-	}
-
-	pub fn is_free(&self) -> bool {
-		return self.name.len() != 0
-	}
-
-	pub fn retval(name: &str) -> Source {
-		println!("WARNING: using broken retval type");
-		Source{
-			name: name.to_string(), generator: Box::new(GenNothing{}),
-			ty: Type::Builtin(Native::U8), /* FIXME broken */
-		}
-	}
-	pub fn is_retval(&self) -> bool {
-		false
-	}
-}
-
-impl Name for Source {
-	fn name(&self) -> String {
-		if self.is_free() { return self.name.clone(); }
-		if self.is_retval() { return "?retval-for-fqn?".to_string(); }
-		println!("invalid source: {:?}", self);
-		unreachable!();
-	}
-}
 
 // A variable has a root type, but when used in functions it may need to be
 // transformed in some way.  The classic example is a stack variable that needs
@@ -639,15 +569,18 @@ impl Generator for GenCString {
 
 #[cfg(test)]
 mod test {
-	use variable::{Generator, GenNothing, Source};
+	use variable::{generator, Generator};
 	use typ::{Native, Type};
 
+	macro_rules! genmatch {
+		($gtype:expr, $gname:expr) => (
+			let gen: Box<Generator> = generator(&$gtype);
+			assert_eq!(gen.name(), $gname);
+		)
+	}
+
 	#[test]
-	fn test_src_clone() {
-		let intg = Type::Builtin(Native::Integer);
-		let generators: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		let it = Source::free("item", &intg, "", &generators);
-		let cpy = it.clone();
-		assert_eq!(cpy.name, it.name);
+	fn gen_native() {
+		genmatch!(Type::Builtin(Native::I32), "std:I32orig");
 	}
 }

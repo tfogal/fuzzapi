@@ -225,12 +225,10 @@ fn main() {
 		"enum ACTION { FIND = 0 , ENTER = 1 , }" +
 		"var:free nel gen:Usize usize\n" +
 		"var:free tbl gen:opaque struct hsearch_data\n" +
-		/* no current way to represent hcreate_r return value .. */
 		"var:free item gen:udt struct entry\n" +
 		"var:free actvar gen:Enum enum ACTION\n" +
 		// note the API has a fqn argument named "retval"!
 		"var:free retval gen:udt pointer struct entry\n" +
-		/* no current way to represent hsearch_r's retval ... */
 		"function:new hcreate_r int {\n" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n" +
@@ -308,12 +306,10 @@ mod test {
 			"enum ACTION { FIND = 0 , ENTER = 1 , }" +
 			"var:free nel gen:Usize usize\n" +
 			"var:free tbl gen:opaque struct hsearch_data\n" +
-			/* no current way to represent hcreate_r return value .. */
 			"var:free item gen:udt struct entry\n" +
 			"var:free actvar gen:Enum enum ACTION\n" +
 			// note the API has a fqn argument named "retval"!
 			"var:free retval gen:udt pointer struct entry\n" +
-			/* no current way to represent hsearch_r's retval ... */
 			"function:new hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +

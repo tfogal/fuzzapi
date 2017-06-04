@@ -3,7 +3,6 @@ use std::io::Error;
 use api::*;
 use stmt;
 use typ::*;
-use variable::Source;
 
 #[derive(Clone, Debug)]
 pub struct Argument {
@@ -22,17 +21,7 @@ impl Argument {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct ReturnType {
-	pub ty: Type,
-	pub src: Source,
-}
-impl ReturnType {
-	// fixme: no Source!
-	pub fn new(t: &Type, s: Source) -> Self {
-		ReturnType{ty: t.clone(), src: s}
-	}
-}
+pub type ReturnType = Type;
 
 #[derive(Clone, Debug)]
 pub struct Function {
