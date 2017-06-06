@@ -93,16 +93,6 @@ pub fn generator(t: &Type) -> Box<Generator> {
 	}
 }
 
-pub fn generator_list<'a>(nm: &str, generators: &'a Vec<Box<Generator>>) ->
-	Option<Box<Generator>> {
-	for gen in generators {
-		if gen.name() == nm {
-			return Some((*gen).clone());
-		}
-	}
-	return None;
-}
-
 //---------------------------------------------------------------------
 
 // The generator attached to a Source will only be called if the source is a
