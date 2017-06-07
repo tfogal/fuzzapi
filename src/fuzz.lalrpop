@@ -135,6 +135,9 @@ LStmt: api::Stmt = {
 	<lhs: LExpr> "=" <rhs: LExpr> => {
 		api::Stmt::Assignment(lhs, rhs)
 	},
+	"verify:new" <expr: LExpr> => {
+		api::Stmt::Verify(expr)
+	},
 };
 
 LExpr: api::Expr = {
