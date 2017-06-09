@@ -267,7 +267,6 @@ impl Program {
 	// Resolves references and the like in the AST.
 	// After, the AST list will be empty and our list of Statements will have
 	// everything we need.
-	// need.
 	fn ast_resolve(&mut self) {
 		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.ast.len());
 		for var in self.symtab.iter() {
