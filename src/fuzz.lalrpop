@@ -39,7 +39,7 @@ LUDTDecl: api::DeclType = {
 };
 
 LIdentifier: String = {
-	<nm: r"[[:alpha:]]+([[:alnum:]]|_)*"> => nm.to_string(),
+	<nm: r"[A-Za-z][A-Za-z0-9_]*"> => nm.to_string(),
 };
 
 LField: api::UDTDecl = {
@@ -84,10 +84,14 @@ LConstant: ::typ::EnumValue = {
 };
 
 LFreeVar: api::FreeVarDecl = {
-	"var" ":" "free" <id: LIdentifier> "gen" ":" <gen: LIdentifier>
+	"var:free" <id: LIdentifier> "gen:std:" <gen: LIdentifier>
+	<typename: LTypeRef> => {
+		api::FreeVarDecl{name: id, genname: "std:".to_string() + &gen, ty: typename}
+	},
+	"var:free" <id: LIdentifier> "gen:" <gen: LIdentifier>
 	<typename: LTypeRef> => {
 		api::FreeVarDecl{name: id, genname: gen, ty: typename}
-	}
+	},
 };
 
 LOperation: variable::ScalarOp = {

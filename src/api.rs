@@ -146,8 +146,10 @@ impl Program {
 	}
 
 	fn genlookup(&self, ty: &Type, genname: &str) -> Option<Box<Generator>> {
+		#[allow(non_snake_case)]
+		let GENNAME = genname.to_string().to_uppercase();
 		for gen in self.genlist.iter() {
-			if gen.name() == genname {
+			if gen.name().to_uppercase() == GENNAME {
 				return Some((*gen).clone());
 			}
 		}
