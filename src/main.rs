@@ -415,4 +415,16 @@ mod test {
 		}
 		drop(strm);
 	}
+
+	#[test]
+	fn verify_statement() {
+		let prg = "var:free uvar gen:std:U8 u32\n".to_string() +
+			"verify:new uvar";
+		let mut lprog = match fuzz::parse_LProgram(prg.clone().as_str()) {
+			Err(e) => panic!("{:?}", e),
+			Ok(p) => p,
+		};
+		lprog.set_generators(&parse_generators("./share/stdgen.hf"));
+		match lprog.analyze() { Err(e) => panic!(e), Ok(_) => () };
+	}
 }
