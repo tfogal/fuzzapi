@@ -22,19 +22,6 @@ pub enum DeclType {
 	EnumRef(String),
 }
 
-impl DeclType {
-	fn typename(&self) -> String {
-		use typ::Name;
-		match self {
-			&DeclType::Basic(ref ty) => ty.name(),
-			&DeclType::Struct(ref nm, _) => nm.clone(),
-			&DeclType::Enum(ref nm, _) => nm.clone(),
-			&DeclType::StructRef(ref to) => to.clone(),
-			&DeclType::EnumRef(ref to) => to.clone(),
-		}
-	}
-}
-
 #[derive(Clone, Debug)]
 pub struct UDTDecl {
 	pub name: String,
