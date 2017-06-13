@@ -154,7 +154,13 @@ impl Program {
 					let sym = Symbol{name: fvd.name.clone(), generator: gen, typ: ty};
 					self.symtab.push(sym);
 				},
-				Declaration::Function(_) => (),
+				Declaration::Function(ref fqn) => {
+					let ty = type_from_decl(&fqn.retval, &self.typetab);
+					use variable;
+					let gen = Box::new(variable::GenNothing{});
+					let sym = Symbol{name: fqn.name.clone(), generator: gen, typ: ty};
+					self.symtab.push(sym);
+				},
 				Declaration::UDT(_) => (),
 			}
 		}
@@ -259,6 +265,16 @@ impl Program {
 	fn ast_resolve(&mut self) {
 		let mut stmts: Vec<stmt::Statement> = Vec::with_capacity(self.ast.len());
 		for var in self.symtab.iter() {
+			// hack: we want to insert functions into our symtable so that we can
+			// lookup the function's type from its name.  but we don't want to
+			// declare functions as variables.
+			// function entries in the symtable have bogus GenNothing generators
+			// (because a generator makes no sense for a function call; it generates
+			// whatever the call does!), so use that as a hack to see if it's
+			// something we should be creating.
+			if var.generator.name() == "std:nothing" {
+				continue;
+			}
 			let s = stmt::Statement::VariableDeclaration(var.name.clone(),
 			                                             var.typ.clone());
 			stmts.push(s);

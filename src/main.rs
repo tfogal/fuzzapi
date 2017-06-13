@@ -401,6 +401,9 @@ mod test {
 			Err(e) => panic!(e),
 			_ => (),
 		};
+		for st in lprogram.statements.iter() {
+			println!("st: {:?}", st);
+		}
 		assert_eq!(lprogram.statements.len(), 7);
 		let hdrs: Vec<&str> = vec!["stdlib.h", "search.h"];
 		let mut strm: Vec<u8> = Vec::new();
