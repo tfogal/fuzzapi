@@ -217,8 +217,8 @@ impl Program {
 					let ex = self.expr_to_expr(a.deref().clone());
 					args.push(function::Argument::new(&ex));
 				}
-				println!("FIXME: miserable return type setup for fqn call");
-				let rettype = Type::Builtin(Native::Integer);
+				let symfunc = self.symlookup(nm).unwrap();
+				let rettype = symfunc.typ.clone();
 				let fqn = function::Function::new(&nm, &rettype, &args);
 				stmt::Expression::FqnCall(fqn)
 			},
