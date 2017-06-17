@@ -557,6 +557,55 @@ impl Generator for GenCString {
 	}
 }
 
+// GenIgnore creates a generator that wraps around another generator and
+// ignores one of its states.
+pub struct GenIgnore {
+	subgen: Box<Generator>,
+	ign: usize,
+	idx: usize,
+	name: String,
+}
+
+impl GenIgnore {
+	// Creates a new generator named 'nm' that ignores 'gen's 'index' element.
+	pub fn new(gen: Box<Generator>, index: usize, nm: &str) -> GenIgnore {
+		let curidx = if index == 0 { 1 } else { 0 };
+		return GenIgnore{ subgen: gen.clone(), ign: index, idx: curidx,
+		                  name: nm.to_string() };
+	}
+}
+impl Generator for GenIgnore {
+	fn name(&self) -> String { self.name.clone() }
+	fn value(&self) -> String { self.subgen.value() }
+
+	fn next(&mut self) {
+		self.subgen.next();
+		// also keep track locally:
+		if self.idx < self.subgen.n_state()-1 {
+			self.idx = self.idx + 1
+		}
+		// ... and if the local value is the ignore value, .next() again:
+		if self.idx == self.ign {
+			self.next()
+		}
+	}
+	fn done(&self) -> bool {
+		return self.idx >= self.subgen.n_state()-1;
+	}
+	fn n_state(&self) -> usize { self.subgen.n_state()-1 }
+	fn reset(&mut self) {
+		self.idx = if self.ign == 0 { 1 } else { 0 };
+		self.subgen.reset();
+	}
+
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "ign{{{} of {}}}", self.idx, self.n_state()-1)
+	}
+	fn clone(&self) -> Box<Generator> {
+		Box::new(GenIgnore::new(self.subgen.clone(), self.ign, &self.name))
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use variable::{generator, Generator};
