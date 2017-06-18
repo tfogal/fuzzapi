@@ -408,7 +408,6 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 			for typex in types {
 				match typex {
 					&Type::Struct(ref strct, _) if strct == nm => rv = typex.clone(),
-					&Type::Struct(ref strct, _) => (),
 					_ => {},
 				};
 			}
