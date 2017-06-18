@@ -622,4 +622,18 @@ mod test {
 	fn gen_native() {
 		genmatch!(Type::Builtin(Native::I32), "std:I32orig");
 	}
+
+	#[test]
+	fn gen_ignore_null_cstring() {
+		use super::*;
+		let cstype = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
+		let mut cs = GenCString::create(&cstype);
+		let mut nncs = GenIgnore::new(cs.clone(), 0, "std:cstring:nonnull");
+		assert_eq!(nncs.n_state(), cs.n_state()-1);
+		for _ in 0..cs.n_state()-2 {
+			nncs.next(); cs.next();
+		}
+		assert!(nncs.done());
+		assert!(!cs.done());
+	}
 }
