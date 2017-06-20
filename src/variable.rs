@@ -561,9 +561,9 @@ impl Generator for GenCString {
 // ignores one of its states.
 pub struct GenIgnore {
 	subgen: Box<Generator>,
-	ign: usize,
-	idx: usize,
-	name: String,
+	ign: usize, // the index to ignore
+	idx: usize, // the index we are currently at.  should never be == to ign
+	name: String, // name of the generator, for name().  client gives this to us.
 }
 
 impl GenIgnore {
@@ -596,6 +596,9 @@ impl Generator for GenIgnore {
 	fn reset(&mut self) {
 		self.idx = if self.ign == 0 { 1 } else { 0 };
 		self.subgen.reset();
+		if self.ign == 0 {
+			self.subgen.next();
+		}
 	}
 
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
