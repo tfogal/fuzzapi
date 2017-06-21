@@ -638,5 +638,23 @@ mod test {
 		}
 		assert!(nncs.done());
 		assert!(!cs.done());
+		nncs.reset();
+		// Ideally we would not verify the order that the generator creates these,
+		// but that would complicate the test code significantly.
+		let zerolen = nncs.value(); nncs.next();
+		let normal1 = nncs.value(); nncs.next();
+		let special1 = nncs.value(); nncs.next();
+		let normalN = nncs.value(); nncs.next();
+		let specialN = nncs.value(); nncs.next();
+		let mixedN = nncs.value(); nncs.next();
+		let longstr = nncs.value(); nncs.next();
+		println!("zerolen: '{}'", zerolen);
+		assert_eq!(zerolen, "\"\"".to_string());
+		assert_eq!(normal1.len(), 3);
+		assert_eq!(special1.len(), 3);
+		assert!(normalN.len() > 3);
+		assert!(specialN.len() > 3);
+		assert!(mixedN.len() > 3);
+		assert!(longstr.len() > 128);
 	}
 }
