@@ -167,8 +167,13 @@ fn builtin_generators() -> Vec<Box<variable::Generator>> {
 	rv.push(Box::new(variable::GenI32::create(&Type::Builtin(Native::I32))));
 	rv.push(Box::new(variable::GenUsize::create(&Type::Builtin(Native::Usize))));
 	let ptr = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
-	rv.push(Box::new(variable::GenCString::create(&ptr)));
 	rv.push(variable::natgenerator(&Native::Integer));
+	rv.push(Box::new(variable::GenCString::create(&ptr)));
+	let cstype = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
+	let cs = variable::GenCString::create(&cstype);
+	use variable::Generator;
+	let nncs = variable::GenIgnore::new(cs.clone(), 0, "std:cstring:nonnull");
+	rv.push(Box::new(nncs));
 
 	return rv;
 }
