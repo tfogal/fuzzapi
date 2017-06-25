@@ -10,6 +10,7 @@ use variable::Generator;
 pub enum Opcode {
 	Add, Sub, Mul, Div, Mod,
 	LAnd, LOr,
+	Greater, Less,
 }
 impl Opcode {
 	// Given a left hand side type and a right hand side type, derive the
@@ -43,6 +44,8 @@ impl fmt::Display for Opcode {
 			&Opcode::Mod => write!(f, "%"),
 			&Opcode::LAnd => write!(f, "&&"),
 			&Opcode::LOr => write!(f, "||"),
+			&Opcode::Greater => write!(f, ">"),
+			&Opcode::Less => write!(f, "<"),
 		}
 	}
 }
@@ -116,6 +119,8 @@ impl UserGen {
 					&Opcode::Mod => lhs % rhs,
 					&Opcode::LAnd => (lhs > 0 && rhs > 0) as i64,
 					&Opcode::LOr => (lhs > 0 || rhs > 0) as i64,
+					&Opcode::Greater => (lhs > rhs) as i64,
+					&Opcode::Less => (lhs < rhs) as i64,
 				};
 				result.to_string()
 			},
@@ -166,6 +171,10 @@ impl fmt::Debug for Expression {
 				write!(f, "{:?} && {:?}", left, right),
 			&Expression::Compound(ref left, Opcode::LOr, ref right) =>
 				write!(f, "{:?} || {:?}", left, right),
+			&Expression::Compound(ref left, Opcode::Greater, ref right) =>
+				write!(f, "{:?} > {:?}", left, right),
+			&Expression::Compound(ref left, Opcode::Less, ref right) =>
+				write!(f, "{:?} < {:?}", left, right),
 			&Expression::MinExpr(ref ty) => write!(f, "{}:min()", ty.name()),
 			&Expression::MaxExpr(ref ty) => write!(f, "{}:max()", ty.name()),
 			&Expression::RandomExpr(ref ty, ref low, ref high) =>
