@@ -15,6 +15,8 @@ pub trait Code {
 #[derive(Clone,Debug)]
 pub enum Expression {
 	Basic(variable::ScalarOp, Symbol),
+	IConstant(i64),
+	FConstant(f64),
 	Compound(Box<Expression>, Opcode, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
 	// of statements.  Then any expression, no matter how trivial, is a
@@ -34,6 +36,12 @@ impl Expression {
 					&variable::ScalarOp::AddressOf =>
 						Type::Pointer(Box::new(src.typ.clone())),
 				}
+			},
+			&Expression::IConstant(_) => {
+				Type::Builtin(Native::I64)
+			},
+			&Expression::FConstant(_) => {
+				Type::Builtin(Native::F64)
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				let l = lhs.extype();
@@ -58,6 +66,12 @@ impl Code for Expression {
 		match self {
 			&Expression::Basic(ref op, ref src) => {
 				write!(strm, "{}{}", op.to_string(), src.name)
+			},
+			&Expression::IConstant(integer) => {
+				write!(strm, "{}", integer)
+			},
+			&Expression::FConstant(fpval) => {
+				write!(strm, "{}", fpval)
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				try!(lhs.codegen(strm, program));
@@ -84,6 +98,7 @@ pub enum Statement {
 	Expr(Expression),
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
+	Constraint(Expression),
 	/* todo: 'if' and 'loop' etc. */
 }
 
@@ -111,6 +126,18 @@ impl Code for Statement {
 				try!(expr.codegen(strm, pgm));
 				write!(strm, ");")
 			},
+			&Statement::Constraint(ref expr) => {
+				// Constraints are sort of like verify expressions, but if the
+				// constraint is not satisfied then we just can't test the program at
+				// all.  As a bit of a hack, we still generate the whole program, we
+				// just have the program exit early (successfully) if the constraint is
+				// invalidated.
+				try!(write!(strm, "if(!("));
+				try!(expr.codegen(strm, pgm));
+				try!(writeln!(strm, ")) {{"));
+				try!(writeln!(strm, "\texit(EXIT_SUCCESS);"));
+				write!(strm, "}}")
+			}
 		}
 	}
 }
