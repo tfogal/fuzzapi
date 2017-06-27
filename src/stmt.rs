@@ -313,4 +313,20 @@ mod test {
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
 	}
+
+	#[test]
+	fn constraint_stmt() {
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("a", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let vara = pgm.symlookup("a").unwrap();
+		let null = variable::ScalarOp::Null;
+		let lhs = Expression::Basic(null, vara.clone());
+		let rhs = Expression::IConstant(0);
+		let expr = Expression::Compound(Box::new(lhs), Opcode::Greater,
+		                                Box::new(rhs));
+		let cnstrnt = Statement::Constraint(expr);
+		cg_expect!(cnstrnt, "if(!(a > 0)) {\n\texit(EXIT_SUCCESS);\n}", pgm);
+	}
 }
