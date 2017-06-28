@@ -14,9 +14,17 @@ pub enum Opcode {
 }
 impl Opcode {
 	// Given a left hand side type and a right hand side type, derive the
-	// appropriate for the combined expression "lhs op rhs".
+	// appropriate type for the combined expression "lhs op rhs".
 	// todo: return a proper error
 	pub fn result_type(&self, lhs: Type, rhs: Type) -> Type {
+		// todo FIXME: we need a boolean type
+		match self {
+			&Opcode::LAnd => println!("WARNING: need bool type!"),
+			&Opcode::LOr => println!("WARNING: need bool type!"),
+			&Opcode::Greater => println!("WARNING: need bool type!"),
+			&Opcode::Less => println!("WARNING: need bool type!"),
+			_ => (),
+		};
 		let natlhs = match lhs {
 			Type::Builtin(n) => n,
 			_ => unimplemented!(), // only builtin types implemented, for now.
