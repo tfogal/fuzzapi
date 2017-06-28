@@ -60,6 +60,7 @@ pub enum Stmt {
 	VarDecl(FreeVarDecl),
 	Assignment(Expr /* LHS */, Expr /* RHS */),
 	Verify(Expr),
+	Constraint(Expr),
 }
 
 #[derive(Debug)]
@@ -256,6 +257,9 @@ impl Program {
 			Stmt::Verify(ref expr) => {
 				Some(stmt::Statement::Verify(self.expr_to_expr(expr.clone())))
 			},
+			Stmt::Constraint(ref expr) => {
+				Some(stmt::Statement::Constraint(self.expr_to_expr(expr.clone())))
+			}
 		}
 	}
 
