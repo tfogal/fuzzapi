@@ -142,6 +142,9 @@ LStmt: api::Stmt = {
 	"verify:new" <expr: LExpr> => {
 		api::Stmt::Verify(expr)
 	},
+	"constaint:new" <expr: LExpr> => {
+		api::Stmt::Constraint(expr)
+	},
 };
 
 LExpr: api::Expr = {
