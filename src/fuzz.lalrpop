@@ -94,7 +94,7 @@ LFreeVar: api::FreeVarDecl = {
 	},
 };
 
-LOperation: variable::ScalarOp = {
+LScalarOperation: variable::ScalarOp = {
 	"op:null" => variable::ScalarOp::Null,
 	"op:*" => variable::ScalarOp::Deref,
 	"op:deref" => variable::ScalarOp::Deref,
@@ -148,7 +148,7 @@ LStmt: api::Stmt = {
 };
 
 LExpr: api::Expr = {
-	<sop: LOperation> <id: LIdentifier> => {
+	<sop: LScalarOperation> <id: LIdentifier> => {
 		api::Expr::VarRef(sop, id)
 	},
 	<id: LIdentifier> => {
