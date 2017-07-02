@@ -52,6 +52,8 @@ pub enum Declaration {
 #[derive(Clone, Debug)]
 pub enum Expr {
 	VarRef(variable::ScalarOp, String /* varname */),
+	IConst(i64),
+	FConst(f64),
 	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
 }
 #[derive(Clone, Debug)]
@@ -211,6 +213,8 @@ impl Program {
 				let v = self.symlookup(nm).unwrap();
 				stmt::Expression::Basic(*sop, v.clone())
 			},
+			Expr::IConst(iger) => stmt::Expression::IConstant(iger),
+			Expr::FConst(fp) => stmt::Expression::FConstant(fp),
 			Expr::Call(ref nm, ref arglist) => {
 				let mut args: Vec<function::Argument> = Vec::new();
 				for a in arglist.iter() {
@@ -238,6 +242,8 @@ impl Program {
 						println!("Statement with no effect: '{}{}'", op.to_string(), nm);
 						None
 					},
+					Expr::IConst(ig) => panic!("iconst {} cannot be a statement!", ig),
+					Expr::FConst(fp) => panic!("fconst {} cannot be a statement!", fp),
 					Expr::Call(_, _) => {
 						let exp = self.expr_to_expr(expr.clone());
 						Some(stmt::Statement::Expr(exp))
