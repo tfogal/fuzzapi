@@ -171,6 +171,10 @@ LStmt: api::Stmt = {
 };
 
 LExpr: api::Expr = {
+	<term: LTerm> => term,
+};
+
+LTerm: api::Expr = {
 	<sop: LScalarOperation> <id: LIdentifier> => {
 		api::Expr::VarRef(sop, id)
 	},
