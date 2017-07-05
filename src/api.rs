@@ -52,8 +52,8 @@ pub enum Declaration {
 #[derive(Clone, Debug)]
 pub enum Expr {
 	VarRef(variable::ScalarOp, String /* varname */),
-	IConst(i64),
-	FConst(f64),
+	IConst(String),
+	FConst(String),
 	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
 }
 #[derive(Clone, Debug)]
@@ -213,8 +213,14 @@ impl Program {
 				let v = self.symlookup(nm).unwrap();
 				stmt::Expression::Basic(*sop, v.clone())
 			},
-			Expr::IConst(iger) => stmt::Expression::IConstant(iger),
-			Expr::FConst(fp) => stmt::Expression::FConstant(fp),
+			Expr::IConst(iger) => {
+				use std::str::FromStr;
+				stmt::Expression::IConstant(i64::from_str(&iger).unwrap())
+			},
+			Expr::FConst(fp) => {
+				use std::str::FromStr;
+				stmt::Expression::FConstant(f64::from_str(&fp).unwrap())
+			},
 			Expr::Call(ref nm, ref arglist) => {
 				let mut args: Vec<function::Argument> = Vec::new();
 				for a in arglist.iter() {
@@ -242,8 +248,8 @@ impl Program {
 						println!("Statement with no effect: '{}{}'", op.to_string(), nm);
 						None
 					},
-					Expr::IConst(ig) => panic!("iconst {} cannot be a statement!", ig),
-					Expr::FConst(fp) => panic!("fconst {} cannot be a statement!", fp),
+					Expr::IConst(ref i) => panic!("iconst {} cannot be a statement!", i),
+					Expr::FConst(ref f) => panic!("fconst {} cannot be a statement!", f),
 					Expr::Call(_, _) => {
 						let exp = self.expr_to_expr(expr.clone());
 						Some(stmt::Statement::Expr(exp))

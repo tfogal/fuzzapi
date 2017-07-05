@@ -43,14 +43,8 @@ LIdentifier: String = {
 	<nm: r"[A-Za-z][A-Za-z0-9_]*"> => nm.to_string(),
 };
 LNum: api::Expr = {
-	<num: r"-?[0-9]+"> => {
-		use std::str::FromStr;
-		api::Expr::IConst(i64::from_str(num).unwrap())
-	},
-	<num: r"-?[0-9]+\.[0-9]+"> => {
-		use std::str::FromStr;
-		api::Expr::FConst(f64::from_str(num).unwrap())
-	},
+	<num: r"-?[0-9]+"> => api::Expr::IConst(num.to_string()),
+	<num: r"-?[0-9]+\.[0-9]+"> => api::Expr::FConst(num.to_string()),
 };
 
 LField: api::UDTDecl = {
