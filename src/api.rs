@@ -9,9 +9,9 @@ use std;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
+use usergen::Opcode;
 use variable;
 use variable::Generator;
-
 
 #[derive(Clone, Debug)]
 pub enum DeclType {
@@ -55,6 +55,7 @@ pub enum Expr {
 	IConst(String),
 	FConst(String),
 	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
+	Compound(Box<Expr>, Opcode, Box<Expr>),
 }
 #[derive(Clone, Debug)]
 pub enum Stmt {
@@ -233,6 +234,12 @@ impl Program {
 				let fqn = function::Function::new(&nm, &rettype, &args);
 				stmt::Expression::FqnCall(fqn)
 			},
+			Expr::Compound(ref l, ref bop, ref r) => {
+				use std::ops::Deref;
+				let lhs = self.expr_to_expr(l.deref().clone());
+				let rhs = self.expr_to_expr(r.deref().clone());
+				stmt::Expression::Compound(Box::new(lhs), bop.clone(), Box::new(rhs))
+			},
 		}
 	}
 
@@ -253,6 +260,10 @@ impl Program {
 					Expr::Call(_, _) => {
 						let exp = self.expr_to_expr(expr.clone());
 						Some(stmt::Statement::Expr(exp))
+					},
+					Expr::Compound(_, ref op, _) => {
+						println!("Compond statement ({}) with no effect.", op.to_string());
+						None
 					},
 				}
 			},
