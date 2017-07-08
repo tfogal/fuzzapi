@@ -11,6 +11,7 @@ pub enum Opcode {
 	Add, Sub, Mul, Div, Mod,
 	LAnd, LOr,
 	Greater, Less,
+	NotEqual, Equal,
 }
 impl Opcode {
 	// Given a left hand side type and a right hand side type, derive the
@@ -23,6 +24,8 @@ impl Opcode {
 			&Opcode::LOr => println!("WARNING: need bool type!"),
 			&Opcode::Greater => println!("WARNING: need bool type!"),
 			&Opcode::Less => println!("WARNING: need bool type!"),
+			&Opcode::NotEqual => println!("WARNING: need bool type!"),
+			&Opcode::Equal => println!("WARNING: need bool type!"),
 			_ => (),
 		};
 		let natlhs = match lhs {
@@ -54,6 +57,8 @@ impl fmt::Display for Opcode {
 			&Opcode::LOr => write!(f, "||"),
 			&Opcode::Greater => write!(f, ">"),
 			&Opcode::Less => write!(f, "<"),
+			&Opcode::NotEqual => write!(f, "!="),
+			&Opcode::Equal => write!(f, "=="),
 		}
 	}
 }
@@ -129,6 +134,8 @@ impl UserGen {
 					&Opcode::LOr => (lhs > 0 || rhs > 0) as i64,
 					&Opcode::Greater => (lhs > rhs) as i64,
 					&Opcode::Less => (lhs < rhs) as i64,
+					&Opcode::NotEqual => (lhs != rhs) as i64,
+					&Opcode::Equal => (lhs == rhs) as i64,
 				};
 				result.to_string()
 			},
@@ -183,6 +190,10 @@ impl fmt::Debug for Expression {
 				write!(f, "{:?} > {:?}", left, right),
 			&Expression::Compound(ref left, Opcode::Less, ref right) =>
 				write!(f, "{:?} < {:?}", left, right),
+			&Expression::Compound(ref left, Opcode::NotEqual, ref right) =>
+				write!(f, "{:?} != {:?}", left, right),
+			&Expression::Compound(ref left, Opcode::Equal, ref right) =>
+				write!(f, "{:?} == {:?}", left, right),
 			&Expression::MinExpr(ref ty) => write!(f, "{}:min()", ty.name()),
 			&Expression::MaxExpr(ref ty) => write!(f, "{}:max()", ty.name()),
 			&Expression::RandomExpr(ref ty, ref low, ref high) =>
