@@ -166,6 +166,13 @@ LStmt: api::Stmt = {
 
 LExpr: api::Expr = {
 	<term: LTerm> => term,
+	<cexpr: LCompoundExpr> => cexpr,
+};
+
+LCompoundExpr: api::Expr = {
+	<lhs: LTerm> <binop: LBinOp> <rhs: LTerm> => {
+		api::Expr::Compound(Box::new(lhs), binop, Box::new(rhs))
+	},
 };
 
 LTerm: api::Expr = {
