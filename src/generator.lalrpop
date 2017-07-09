@@ -1,5 +1,6 @@
 // Parsing code for externally-defined generators.
 use std::str::FromStr;
+use opcode;
 use typ::*;
 use usergen;
 use util;
@@ -72,19 +73,19 @@ LExpression: usergen::Expression = {
 	// allow all of the above expressions as the RHS of all the following
 	// expressions, and such recursion *requires* precedence specification.
 	<left: LExpression> "+" <right: LFactor> =>
-		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Add,
+		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Add,
 		                             Box::new(right)),
 	<left: LExpression> "-" <right: LFactor> =>
-		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Sub,
+		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Sub,
 		                             Box::new(right)),
 	<left: LExpression> "/" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Div,
+		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Div,
 		                             Box::new(right)),
 	<left: LExpression> "*" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Mul,
+		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Mul,
 		                             Box::new(right)),
 	<left: LFactor> "%" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), usergen::Opcode::Mod,
+		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Mod,
 		                             Box::new(right)),
 };
 

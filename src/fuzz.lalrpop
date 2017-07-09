@@ -1,7 +1,7 @@
 // Parsing grammar/code for the user's program abstraction.
 use api;
 use typ::{Native, Type};
-use usergen;
+use opcode;
 use variable;
 
 grammar;
@@ -120,16 +120,16 @@ LArgTy: api::DeclType = {
 	},
 };
 
-LBinOp: usergen::Opcode = {
-	"+" => usergen::Opcode::Add,
-	"-" => usergen::Opcode::Sub,
-	"*" => usergen::Opcode::Mul,
-	"/" => usergen::Opcode::Div,
-	"%" => usergen::Opcode::Mod,
-	"&&" => usergen::Opcode::LAnd,
-	"||" => usergen::Opcode::LOr,
-	">" => usergen::Opcode::Greater,
-	"<" => usergen::Opcode::Less,
+LBinOp: opcode::Opcode = {
+	"+" => opcode::Opcode::Add,
+	"-" => opcode::Opcode::Sub,
+	"*" => opcode::Opcode::Mul,
+	"/" => opcode::Opcode::Div,
+	"%" => opcode::Opcode::Mod,
+	"&&" => opcode::Opcode::LAnd,
+	"||" => opcode::Opcode::LOr,
+	">" => opcode::Opcode::Greater,
+	"<" => opcode::Opcode::Less,
 };
 
 LTypeRef: api::DeclType = {

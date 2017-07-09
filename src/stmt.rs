@@ -3,7 +3,7 @@ use std::io::{Error};
 use api::*;
 use function::*;
 use typ::*;
-use usergen::Opcode;
+use opcode::Opcode;
 use variable;
 
 // Code is anything we can generate code for.
