@@ -132,6 +132,28 @@ LBinOp: opcode::Opcode = {
 	"<" => opcode::Opcode::Less,
 };
 
+LAddSub: opcode::Opcode = {
+	"+" => opcode::Opcode::Add,
+	"-" => opcode::Opcode::Sub,
+};
+LMulDiv: opcode::Opcode = {
+	"*" => opcode::Opcode::Mul,
+	"/" => opcode::Opcode::Div,
+	"%" => opcode::Opcode::Mod,
+};
+LLogical: opcode::Opcode = {
+	"&&" => opcode::Opcode::LAnd,
+	"||" => opcode::Opcode::LOr,
+};
+// We should technically separate out Eq/Ne because they should have lower
+// precedence than other relational ops.  But for now ...
+LRelational: opcode::Opcode = {
+	">" => opcode::Opcode::Greater,
+	"<" => opcode::Opcode::Less,
+	"==" => opcode::Opcode::Equal,
+	"!=" => opcode::Opcode::NotEqual,
+};
+
 LTypeRef: api::DeclType = {
 	<builtin: LSimpleType> => {
 		let ty = Type::Builtin(builtin);
