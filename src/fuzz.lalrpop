@@ -181,7 +181,8 @@ LStmt: api::Stmt = {
 	"verify:new" <expr: LExpr> => {
 		api::Stmt::Verify(expr)
 	},
-	"constaint:new" <expr: LExpr> => {
+	"constraint:new" <expr: LExpr> => {
+		// add parentheses for the expr ?
 		api::Stmt::Constraint(expr)
 	},
 };
