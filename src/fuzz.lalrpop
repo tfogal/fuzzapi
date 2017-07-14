@@ -213,4 +213,5 @@ LTerm: api::Expr = {
 		}
 		api::Expr::Call(id, arglist)
 	},
+	<cnst: LNum> => cnst,
 };
