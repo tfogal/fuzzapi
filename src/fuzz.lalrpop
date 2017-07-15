@@ -188,14 +188,35 @@ LStmt: api::Stmt = {
 };
 
 LExpr: api::Expr = {
-	<term: LTerm> => term,
-	<cexpr: LCompoundExpr> => cexpr,
+	<ll: LLogicalTerm> => ll,
 };
 
-LCompoundExpr: api::Expr = {
-	<lhs: LTerm> <binop: LBinOp> <rhs: LTerm> => {
-		api::Expr::Compound(Box::new(lhs), binop, Box::new(rhs))
+LLogicalTerm: api::Expr = {
+	<lhs: LLogicalTerm> <bop: LLogical> <rhs: LRelationalTerm> => {
+		api::Expr::Compound(Box::new(lhs), bop, Box::new(rhs))
 	},
+	<lrt: LRelationalTerm> => lrt,
+};
+
+LRelationalTerm: api::Expr = {
+	<lhs: LRelationalTerm> <bop: LRelational> <rhs: LASTerm> => {
+		api::Expr::Compound(Box::new(lhs), bop, Box::new(rhs))
+	},
+	<astm: LASTerm> => astm,
+};
+
+LASTerm: api::Expr = {
+	<lhs: LASTerm> <bop: LAddSub> <rhs: LMDTerm> => {
+		api::Expr::Compound(Box::new(lhs), bop, Box::new(rhs))
+	},
+	<term: LMDTerm> => term,
+};
+
+LMDTerm: api::Expr = {
+	<lhs: LMDTerm> <bop: LMulDiv> <rhs: LTerm> => {
+		api::Expr::Compound(Box::new(lhs), bop, Box::new(rhs))
+	},
+	<term: LTerm> => term,
 };
 
 LTerm: api::Expr = {
