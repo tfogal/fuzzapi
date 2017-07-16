@@ -24,6 +24,8 @@ pub enum Expression {
 	// a representable statement, which is nonsense, but I suppose it mirrors C
 	// so at least it's intuitive.
 	FqnCall(Function),
+	// Field expression is a field of a struct.
+	Field(Symbol, String),
 }
 
 impl Expression {
@@ -50,6 +52,23 @@ impl Expression {
 			},
 			&Expression::FqnCall(ref fqn) => {
 				fqn.retval.clone()
+			},
+			&Expression::Field(ref sym, ref fld) => {
+				// "cast" to the Struct type from sym's type.
+				let fields = match sym.typ {
+					Type::Struct(_, ref flds) => flds,
+					_ =>
+						panic!("Field expr {} references {:?} type; must be a struct.",
+						       fld, sym.typ),
+				};
+				use typ;
+				let find_field_name = |f: &typ::Field| { f.0 == *fld };
+				let idx = match fields.iter().position(find_field_name) {
+					None => panic!("Struct '{:?}' has no field '{}'", sym.typ, fld),
+					Some(i) => i,
+				};
+				use std::ops::Deref;
+				fields[idx].1.deref().clone()
 			},
 		}
 	}
@@ -87,6 +106,9 @@ impl Code for Expression {
 					}
 				}
 				write!(strm, ")")
+			},
+			&Expression::Field(ref sym, ref fld) => {
+				write!(strm, "{}.{}", sym.name, fld)
 			},
 		}
 	}
