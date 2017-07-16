@@ -690,4 +690,16 @@ mod test {
 		assert_eq!(decls.len(), 3);
 		// should assert that the hcreate_r's 2nd arg == types[0].
 	}
+
+	#[test]
+	fn compound_expr() {
+		let s = "var:free x gen:std:I32 i32\n".to_string() +
+			"var:free y gen:std:I32 i32\n" +
+			"constraint:new x > 0 && y < 0\n";
+		let mut pgm: api::Program = match fuzz::parse_LProgram(s.as_str()) {
+			Ok(p) => p,
+			Err(e) => panic!("{:?}", e),
+		};
+		pgm.analyze();
+	}
 }
