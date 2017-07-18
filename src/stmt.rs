@@ -351,4 +351,23 @@ mod test {
 		let cnstrnt = Statement::Constraint(expr);
 		cg_expect!(cnstrnt, "if(!(a > 0)) {\n\texit(EXIT_SUCCESS);\n}", pgm);
 	}
+
+	#[test]
+	fn field_expr() {
+		let char_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Character)));
+		let void_ptr = Type::Pointer(Box::new(Type::Builtin(Native::Void)));
+		let entry = Type::Struct("ENTRY".to_string(), vec![
+			("key".to_string(), Box::new(char_ptr.clone())),
+			("data".to_string(), Box::new(void_ptr.clone())),
+		]);
+		let foo = Symbol{name: "foo".to_string(),
+		                 generator: variable::generator(&entry), typ: entry};
+		let keyexpr = Expression::Field(foo.clone(), "key".to_string());
+		let dataexpr = Expression::Field(foo, "data".to_string());
+		assert_eq!(keyexpr.extype(), char_ptr);
+		assert_eq!(dataexpr.extype(), void_ptr);
+		let pgm = Program::new(&vec![], &vec![]);
+		cg_expect!(keyexpr, "foo.key", pgm);
+		cg_expect!(dataexpr, "foo.data", pgm);
+	}
 }
