@@ -56,6 +56,7 @@ pub enum Expr {
 	FConst(String),
 	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
 	Compound(Box<Expr>, Opcode, Box<Expr>),
+	Field(String, String),
 }
 #[derive(Clone, Debug)]
 pub enum Stmt {
@@ -240,6 +241,10 @@ impl Program {
 				let rhs = self.expr_to_expr(r.deref().clone());
 				stmt::Expression::Compound(Box::new(lhs), bop.clone(), Box::new(rhs))
 			},
+			Expr::Field(symname, fld) => {
+				let var = self.symlookup(&symname).unwrap();
+				stmt::Expression::Field(var.clone(), fld)
+			},
 		}
 	}
 
@@ -263,6 +268,10 @@ impl Program {
 					},
 					Expr::Compound(_, ref op, _) => {
 						println!("Compond statement ({}) with no effect.", op.to_string());
+						None
+					},
+					Expr::Field(ref sym, ref fld) => {
+						println!("Statement with no effect: '{}.{}'", sym, fld);
 						None
 					},
 				}
