@@ -235,4 +235,11 @@ LTerm: api::Expr = {
 		api::Expr::Call(id, arglist)
 	},
 	<cnst: LNum> => cnst,
+	<fldexpr: LFieldExpr> => fldexpr,
+};
+
+LFieldExpr: api::Expr = {
+	<object: LIdentifier> "." <field: LIdentifier> => {
+		api::Expr::Field(object, field)
+	},
 };
