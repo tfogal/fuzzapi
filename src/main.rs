@@ -243,6 +243,7 @@ fn main() {
 		"function:new hsearch_r int {\n" +
 			"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 		"}\n" +
+		"constraint:new item.key != 0\n" +
 		"function:call hcreate_r { nel op:& tbl }\n" +
 		"function:call hsearch_r { item actvar op:& retval op:& tbl }\n";
 	let mut lprogram = match fuzz::parse_LProgram(s.as_str()) {
@@ -255,7 +256,7 @@ fn main() {
 		Err(e) => panic!(e),
 		_ => (),
 	};
-	assert_eq!(lprogram.statements.len(), 7);
+	assert_eq!(lprogram.statements.len(), 8);
 
 	while !lprogram.done() {
 		match compile_and_test_program(&lprogram) {
