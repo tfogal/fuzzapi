@@ -711,4 +711,19 @@ mod test {
 		};
 		pgm.analyze();
 	}
+
+	#[test]
+	fn field_expr() {
+		let s = "struct Entry {\n".to_string() +
+				"pointer char key;\n" +
+				"pointer void value;\n" +
+			"}\n" +
+			"var:free e gen:opaque struct Entry\n" +
+			"e.value = 0\n";
+		let mut pgm: api::Program = match fuzz::parse_LProgram(s.as_str()) {
+			Ok(p) => p,
+			Err(e) => panic!("{:?}", e),
+		};
+		pgm.analyze();
+	}
 }
