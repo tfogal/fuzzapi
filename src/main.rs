@@ -244,7 +244,7 @@ fn main() {
 			"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 		"}\n" +
 		"constraint:new item.key != 0\n" +
-		"function:call hcreate_r { nel op:& tbl }\n" +
+		"constraint:new function:call hcreate_r { nel op:& tbl } != 0\n" +
 		"function:call hsearch_r { item actvar op:& retval op:& tbl }\n";
 	let mut lprogram = match fuzz::parse_LProgram(s.as_str()) {
 		Err(e) => panic!("{:?}", e),
