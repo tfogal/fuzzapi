@@ -474,7 +474,7 @@ impl GenCString {
 	// Generate a 'special' character that is valid in strings.
 	fn special(&self) -> char {
 		let mut x: char = self.control.value(0);
-		let disallowed = [7,8,9,10,11,12,13, 27];
+		let disallowed = [0,7,8,9,10,11,12,13, 27];
 		while disallowed.iter().any(|y| x as u8 == *y) {
 			x = self.control.value(0);
 		}
