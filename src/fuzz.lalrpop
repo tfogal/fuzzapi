@@ -105,6 +105,7 @@ LScalarOperation: variable::ScalarOp = {
 	"op:deref" => variable::ScalarOp::Deref,
 	"op:&" => variable::ScalarOp::AddressOf,
 	"op:addressof" => variable::ScalarOp::AddressOf,
+	"&" => variable::ScalarOp::AddressOf,
 };
 
 LFunc: api::FuncDecl = {
