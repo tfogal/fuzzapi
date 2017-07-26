@@ -44,22 +44,41 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 }
 
 fn system(cmd: &str) -> Result<(), String> {
-	let run = match Command::new(cmd.clone()).output() {
+	use std::fmt;
+	use std::io::Read;
+
+	let mut child = match Command::new(cmd.clone()).spawn() {
 		Err(e) => {
-			use std::fmt;
-			// cat 'run' ...
 			return Err(fmt::format(format_args!("exec {} error: {}", cmd, e)));
 		},
 		Ok(x) => x,
 	};
-	let err = String::from_utf8(run.stderr).unwrap();
-	if err.len() > 0 || !run.status.success() {
+	let errcode = match child.wait() {
+		Err(e) =>
+			return Err(fmt::format(format_args!("exec {} error code: {}", cmd, e))),
+		Ok(x) => x,
+	};
+
+	let mut err: String = Default::default();
+	match child.stderr {
+		None => (),
+		Some(mut serr) => match serr.read_to_string(&mut err) {
+			Err(e) => return Err(fmt::format(format_args!("{}", e))), _ => (),
+		},
+	};
+	if err.len() > 0 || !errcode.success() {
 		use std::fmt;
     return Err(fmt::format(format_args!("execution of {} failed: {}",
 		                                    cmd, err)));
 	}
 
-	let runout: String = String::from_utf8(run.stdout).unwrap();
+	let mut runout: String = Default::default();
+	match child.stdout {
+		None => (),
+		Some(mut sout) => match sout.read_to_string(&mut runout) {
+			Err(e) => return Err(fmt::format(format_args!("{}", e))), _ => (),
+		},
+	};
 	if runout.len() > 0 {
 		println!("program output: '{}'", runout);
 	}
