@@ -709,7 +709,7 @@ mod test {
 			Ok(p) => p,
 			Err(e) => panic!("{:?}", e),
 		};
-		pgm.analyze();
+		match pgm.analyze() { Err(e) => panic!(e), Ok(_) => () };
 	}
 
 	#[test]
@@ -724,6 +724,6 @@ mod test {
 			Ok(p) => p,
 			Err(e) => panic!("{:?}", e),
 		};
-		pgm.analyze();
+		match pgm.analyze() { Err(e) => panic!(e), Ok(_) => () };
 	}
 }
