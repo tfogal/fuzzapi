@@ -645,7 +645,7 @@ mod test {
 		let normal1 = nncs.value(); nncs.next();
 		let special1 = nncs.value(); nncs.next();
 		let normal_n = nncs.value(); nncs.next();
-		let specialN = nncs.value(); nncs.next();
+		let special_n = nncs.value(); nncs.next();
 		let mixed_n = nncs.value(); nncs.next();
 		let longstr = nncs.value(); nncs.next();
 		println!("zerolen: '{}'", zerolen);
@@ -653,7 +653,7 @@ mod test {
 		assert_eq!(normal1.len(), 3);
 		assert_eq!(special1.len(), 3);
 		assert!(normal_n.len() > 3);
-		assert!(specialN.len() > 3);
+		assert!(special_n.len() > 3);
 		assert!(mixed_n.len() > 3);
 		assert!(longstr.len() > 128);
 	}
