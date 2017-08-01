@@ -349,6 +349,14 @@ mod test {
 		s
 	}
 
+	fn tree_gen() -> String {
+		"var:free nvalues gen:Usize usize\n".to_string() +
+			"function:new my_compare int {\n" +
+				"pointer void, pointer void,\n" +
+			"}\n" +
+			"constraint:new nvalues < 42\n"
+	}
+
 	#[test]
 	fn parse_stdgen() {
 		let mut generators = parse_generators("./share/stdgen.hf"); // todo search
@@ -457,5 +465,16 @@ mod test {
 		};
 		lprog.set_generators(&parse_generators("./share/stdgen.hf"));
 		match lprog.analyze() { Err(e) => panic!(e), Ok(_) => () };
+	}
+
+	#[test]
+	fn tree_setup() {
+		let prgstr = tree_gen();
+		let mut pgm = match fuzz::parse_LProgram(prgstr.as_str()) {
+			Err(e) => panic!("{:?}", e),
+			Ok(p) => p,
+		};
+		pgm.set_generators(&parse_generators("./share/stdgen.hf"));
+		match pgm.analyze() { Err(e) => panic!(e), Ok(_) => () };
 	}
 }
