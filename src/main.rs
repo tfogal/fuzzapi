@@ -350,11 +350,17 @@ mod test {
 	}
 
 	fn tree_gen() -> String {
-		"var:free nvalues gen:Usize usize\n".to_string() +
-			"function:new my_compare int {\n" +
-				"pointer void, pointer void,\n" +
-			"}\n" +
-			"constraint:new nvalues < 42\n"
+		"enum VISIT {\n".to_string() +
+			"preorder = 0 ,\n" +
+			"postorder = 1 ,\n" +
+			"endorder = 2 , \n" +
+			"leaf = 3 , \n" +
+		"}\n" +
+		"var:free nvalues gen:Usize usize\n" +
+		"function:new my_compare int {\n" +
+			"pointer void, pointer void,\n" +
+		"}\n" +
+		"constraint:new nvalues < 42\n"
 	}
 
 	#[test]
