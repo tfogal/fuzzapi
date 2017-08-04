@@ -360,6 +360,9 @@ mod test {
 		"function:new my_compare int {\n" +
 			"pointer void, pointer void,\n" +
 		"}\n" +
+		"function:new action void {\n" +
+		"	pointer void, enum VISIT, int,\n" +
+		"}\n" +
 		"constraint:new nvalues < 42\n"
 	}
 
