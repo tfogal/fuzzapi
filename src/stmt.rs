@@ -121,7 +121,8 @@ pub enum Statement {
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
 	Constraint(Expression),
-	/* todo: 'if' and 'loop' etc. */
+	If(Expression, Vec<Box<Statement>> /* stmts if true. */),
+	/* todo: 'loop' etc. */
 }
 
 impl Code for Statement {
@@ -159,7 +160,17 @@ impl Code for Statement {
 				try!(writeln!(strm, ")) {{"));
 				try!(writeln!(strm, "\texit(EXIT_SUCCESS);"));
 				write!(strm, "}}")
-			}
+			},
+			&Statement::If(ref expr, ref stlist) => {
+				try!(write!(strm, "if("));
+				try!(expr.codegen(strm, pgm));
+				try!(writeln!(strm, ") {{"));
+				for stmt in stlist {
+					try!(write!(strm, "\t"));
+					try!(stmt.codegen(strm, pgm));
+				}
+				writeln!(strm, "}}")
+			},
 		}
 	}
 }
