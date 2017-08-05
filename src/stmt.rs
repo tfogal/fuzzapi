@@ -381,4 +381,17 @@ mod test {
 		cg_expect!(keyexpr, "foo.key", pgm);
 		cg_expect!(dataexpr, "foo.data", pgm);
 	}
+
+	#[test]
+	fn if_statement() {
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("a", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let vara = pgm.symlookup("a").unwrap();
+		let null = variable::ScalarOp::Null;
+		let simple = Expression::Basic(null, vara.clone());
+		let ifst = Statement::If(simple, vec![]);
+		cg_expect!(ifst, "if(a) {\n}\n", pgm);
+	}
 }
