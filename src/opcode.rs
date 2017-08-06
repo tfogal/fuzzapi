@@ -7,6 +7,7 @@ pub enum Opcode {
 	LAnd, LOr,
 	Greater, Less,
 	NotEqual, Equal,
+	Not,
 }
 impl Opcode {
 	// Given a left hand side type and a right hand side type, derive the
@@ -54,6 +55,7 @@ impl fmt::Display for Opcode {
 			&Opcode::Less => write!(f, "<"),
 			&Opcode::NotEqual => write!(f, "!="),
 			&Opcode::Equal => write!(f, "=="),
+			&Opcode::Not => write!(f, "!"),
 		}
 	}
 }

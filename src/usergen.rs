@@ -80,6 +80,7 @@ impl UserGen {
 					&Opcode::Less => (lhs < rhs) as i64,
 					&Opcode::NotEqual => (lhs != rhs) as i64,
 					&Opcode::Equal => (lhs == rhs) as i64,
+					&Opcode::Not => unreachable!(),
 				};
 				result.to_string()
 			},
@@ -138,6 +139,8 @@ impl fmt::Debug for Expression {
 				write!(f, "{:?} != {:?}", left, right),
 			&Expression::Compound(ref left, Opcode::Equal, ref right) =>
 				write!(f, "{:?} == {:?}", left, right),
+			&Expression::Compound(_, Opcode::Not, _) =>
+				unreachable!(),
 			&Expression::MinExpr(ref ty) => write!(f, "{}:min()", ty.name()),
 			&Expression::MaxExpr(ref ty) => write!(f, "{}:max()", ty.name()),
 			&Expression::RandomExpr(ref ty, ref low, ref high) =>
