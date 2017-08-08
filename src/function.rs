@@ -6,12 +6,11 @@ use typ::*;
 
 #[derive(Clone, Debug)]
 pub struct Argument {
-	pub ty: Type,
 	pub expr: stmt::Expression,
 }
 impl Argument {
 	pub fn new(expression: &stmt::Expression) -> Self {
-		Argument{ty: expression.extype(), expr: expression.clone()}
+		Argument{expr: expression.clone()}
 	}
 
 	pub fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
