@@ -14,8 +14,6 @@ pub LProgram : api::Program = {
 
 pub LDeclarations : Vec<api::Declaration> = {
 	<decllist: LUDTDecl*> <fvarlist: LFreeVar*> <funclist: LFunc*> => {
-		// todo fixme: this should be more than a list of declarations,
-		// abstract code should follow
 		let mut rv: Vec<api::Declaration> = Vec::new();
 		for decl in decllist {
 			rv.push(api::Declaration::UDT(decl));
