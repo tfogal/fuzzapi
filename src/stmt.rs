@@ -121,7 +121,7 @@ pub enum Statement {
 	Assignment(Expression /* LHS */, Expression /* RHS */),
 	Verify(Expression),
 	Constraint(Expression),
-	If(Expression, Vec<Box<Statement>> /* stmts if true. */),
+	If(Expression, Box<Vec<Statement>> /* stmts if true. */),
 	/* todo: 'loop' etc. */
 }
 
@@ -162,10 +162,11 @@ impl Code for Statement {
 				write!(strm, "}}")
 			},
 			&Statement::If(ref expr, ref stlist) => {
+				use std::ops::Deref;
 				try!(write!(strm, "if("));
 				try!(expr.codegen(strm, pgm));
 				try!(writeln!(strm, ") {{"));
-				for stmt in stlist {
+				for stmt in stlist.deref() {
 					try!(write!(strm, "\t"));
 					try!(stmt.codegen(strm, pgm));
 				}
@@ -391,7 +392,7 @@ mod test {
 		let vara = pgm.symlookup("a").unwrap();
 		let null = variable::ScalarOp::Null;
 		let simple = Expression::Basic(null, vara.clone());
-		let ifst = Statement::If(simple, vec![]);
+		let ifst = Statement::If(simple, Box::new(vec![]));
 		cg_expect!(ifst, "if(a) {\n}\n", pgm);
 	}
 }

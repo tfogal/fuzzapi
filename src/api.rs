@@ -65,7 +65,7 @@ pub enum Stmt {
 	Assignment(Expr /* LHS */, Expr /* RHS */),
 	Verify(Expr),
 	Constraint(Expr),
-	If(Expr, Vec<Box<Stmt>>),
+	If(Expr, Box<Vec<Stmt>>),
 }
 
 #[derive(Debug)]
@@ -294,15 +294,17 @@ impl Program {
 				Some(stmt::Statement::Constraint(self.expr_to_expr(expr.clone())))
 			}
 			Stmt::If(ref expr, ref stmts) => {
-				let mut statements: Vec<Box<stmt::Statement>> = vec![];
-				for s in stmts.iter() {
-					let stopt = match self.stmt_to_stmt(*s.clone()) {
+				use std::ops::Deref;
+				let mut statements: Vec<stmt::Statement> = vec![];
+				for s in stmts.deref().iter() {
+					let stopt = match self.stmt_to_stmt(s.clone()) {
 						None => return None,
 						Some(st) => st,
 					};
-					statements.push(Box::new(stopt));
+					statements.push(stopt);
 				}
-				Some(stmt::Statement::If(self.expr_to_expr(expr.clone()), statements))
+				Some(stmt::Statement::If(self.expr_to_expr(expr.clone()),
+				                         Box::new(statements)))
 			}
 		}
 	}
