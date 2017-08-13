@@ -184,6 +184,9 @@ LStmt: api::Stmt = {
 		// add parentheses for the expr ?
 		api::Stmt::Constraint(expr)
 	},
+	"if" "(" <expr: LExpr> ")" "{" <stlist: LStmt*> "}" => {
+		api::Stmt::If(expr, Box::new(stlist))
+	},
 };
 
 LExpr: api::Expr = {
