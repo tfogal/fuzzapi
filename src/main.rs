@@ -486,4 +486,20 @@ mod test {
 		pgm.set_generators(&parse_generators("./share/stdgen.hf"));
 		match pgm.analyze() { Err(e) => panic!(e), Ok(_) => () };
 	}
+
+	#[test]
+	fn if_statement() {
+		let s = "var:free vtest gen:Usize usize\n".to_string() +
+			"function:new printf int { usize, }\n" + // hack ...
+			"if(vtest > 42) {\n" +
+			"  function:call printf { vtest }\n" +
+			"}\n";
+		let mut lpgm = match fuzz::parse_LProgram(s.as_str()) {
+			Err(e) => panic!("{:?}", e),
+			Ok(x) => x,
+		};
+		match lpgm.analyze() {
+			Err(e) => panic!(e), _ => (),
+		};
+	}
 }
