@@ -66,6 +66,7 @@ pub enum Stmt {
 	Verify(Expr),
 	Constraint(Expr),
 	If(Expr, Box<Vec<Stmt>>),
+	While(Expr, Box<Vec<Stmt>>),
 }
 
 #[derive(Debug)]
@@ -303,6 +304,20 @@ impl Program {
 					};
 					statements.push(stopt);
 				}
+				Some(stmt::Statement::If(self.expr_to_expr(expr.clone()),
+				                         Box::new(statements)))
+			},
+			Stmt::While(ref expr, ref stmts) => {
+				use std::ops::Deref;
+				let mut statements: Vec<stmt::Statement> = vec![];
+				for s in stmts.deref().iter() {
+					let stopt = match self.stmt_to_stmt(s.clone()) {
+						None => return None,
+						Some(st) => st,
+					};
+					statements.push(stopt);
+				}
+				// HACK!  need a 'while' in statement
 				Some(stmt::Statement::If(self.expr_to_expr(expr.clone()),
 				                         Box::new(statements)))
 			}
