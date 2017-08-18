@@ -187,6 +187,9 @@ LStmt: api::Stmt = {
 	"if" "(" <expr: LExpr> ")" "{" <stlist: LStmt*> "}" => {
 		api::Stmt::If(expr, Box::new(stlist))
 	},
+	"while" "(" <expr: LExpr> ")" "{" <stlist: LStmt*> "}" => {
+		api::Stmt::While(expr, Box::new(stlist))
+	},
 };
 
 LExpr: api::Expr = {
