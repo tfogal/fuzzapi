@@ -122,6 +122,7 @@ pub enum Statement {
 	Verify(Expression),
 	Constraint(Expression),
 	If(Expression, Box<Vec<Statement>> /* stmts if true. */),
+	While(Expression, Box<Vec<Statement>> /* stmts if true. */),
 	/* todo: 'loop' etc. */
 }
 
@@ -164,6 +165,17 @@ impl Code for Statement {
 			&Statement::If(ref expr, ref stlist) => {
 				use std::ops::Deref;
 				try!(write!(strm, "if("));
+				try!(expr.codegen(strm, pgm));
+				try!(writeln!(strm, ") {{"));
+				for stmt in stlist.deref() {
+					try!(write!(strm, "\t"));
+					try!(stmt.codegen(strm, pgm));
+				}
+				writeln!(strm, "}}")
+			},
+			&Statement::While(ref expr, ref stlist) => {
+				use std::ops::Deref;
+				try!(write!(strm, "while("));
 				try!(expr.codegen(strm, pgm));
 				try!(writeln!(strm, ") {{"));
 				for stmt in stlist.deref() {
