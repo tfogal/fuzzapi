@@ -317,9 +317,8 @@ impl Program {
 					};
 					statements.push(stopt);
 				}
-				// HACK!  need a 'while' in statement
-				Some(stmt::Statement::If(self.expr_to_expr(expr.clone()),
-				                         Box::new(statements)))
+				Some(stmt::Statement::While(self.expr_to_expr(expr.clone()),
+				                            Box::new(statements)))
 			}
 		}
 	}
