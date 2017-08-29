@@ -407,4 +407,17 @@ mod test {
 		let ifst = Statement::If(simple, Box::new(vec![]));
 		cg_expect!(ifst, "if(a) {\n}\n", pgm);
 	}
+
+	#[test]
+	fn while_statement() {
+		let mut pgm = Program::new(&vec![], &vec![
+			vardecl!("foo", Type::Builtin(Native::I32)),
+		]);
+		pgm.analyze().unwrap();
+		let varfoo = pgm.symlookup("foo").unwrap();
+		let null = variable::ScalarOp::Null;
+		let simple = Expression::Basic(null, varfoo.clone());
+		let ifst = Statement::While(simple, Box::new(vec![]));
+		cg_expect!(ifst, "while(foo) {\n}\n", pgm);
+	}
 }
