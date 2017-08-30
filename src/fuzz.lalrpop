@@ -233,9 +233,9 @@ LTerm: api::Expr = {
 		api::Expr::VarRef(sop, id)
 	},
 	"function:call" <id: LIdentifier> "{" <args: LExpr*> "}" => {
-		let mut arglist: Vec<Box<api::Expr>> = Vec::new();
+		let mut arglist: Box<Vec<api::Expr>> = Default::default();
 		for a in args.iter() {
-			arglist.push(Box::new(a.clone()));
+			arglist.push(a.clone());
 		}
 		api::Expr::Call(id, arglist)
 	},

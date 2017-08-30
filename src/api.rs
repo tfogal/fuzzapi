@@ -54,7 +54,7 @@ pub enum Expr {
 	VarRef(variable::ScalarOp, String /* varname */),
 	IConst(String),
 	FConst(String),
-	Call(String /* funcname */, Vec<Box<Expr>> /* args */),
+	Call(String /* funcname */, Box<Vec<Expr>> /* args */),
 	Compound(Box<Expr>, Opcode, Box<Expr>),
 	Field(String, String),
 }
@@ -227,9 +227,9 @@ impl Program {
 			},
 			Expr::Call(ref nm, ref arglist) => {
 				let mut args: Vec<function::Argument> = Vec::new();
-				for a in arglist.iter() {
-					use std::ops::Deref;
-					let ex = self.expr_to_expr(a.deref().clone());
+				use std::ops::Deref;
+				for a in arglist.deref().iter() {
+					let ex = self.expr_to_expr(a.clone());
 					args.push(function::Argument::new(&ex));
 				}
 				let symfunc = self.symlookup(nm).unwrap();
