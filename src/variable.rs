@@ -2,6 +2,7 @@
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
+use std::fmt::Display;
 extern crate rand;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
@@ -97,20 +98,20 @@ pub fn generator_single(t: &Type) -> Box<Generator> {
 	match *t {
 		Type::Function(_) => unimplemented!(),
 		Type::Builtin(ref nat) => match *nat {
-			Native::U8 => Box::new(SingleGen::<u8>::create(0)),
-			Native::U16 => Box::new(SingleGen::<u16>::create(0)),
-			Native::U32 => Box::new(SingleGen::<u32>::create(0)),
-			Native::U64 => Box::new(SingleGen::<u64>::create(0)),
-			Native::I8 => Box::new(SingleGen::<i8>::create(0)),
-			Native::I16 => Box::new(SingleGen::<i16>::create(0)),
-			Native::I32 => Box::new(SingleGen::<i32>::create(0)),
-			Native::I64 => Box::new(SingleGen::<i64>::create(0)),
-			Native::Unsigned => Box::new(SingleGen::<u32>::create(0)),
-			Native::Usize => Box::new(SingleGen::<usize>::create(0)),
-			Native::Integer => Box::new(SingleGen::<i32>::create(0)),
-			Native::F32 => Box::new(SingleGen::<f32>::create(0.0f32)),
-			Native::F64 => Box::new(SingleGen::<f64>::create(0.0)),
-			Native::Character => Box::new(SingleGen::<char>::create('0')),
+			Native::U8 => Box::new(SingleGen::<u8>::create()),
+			Native::U16 => Box::new(SingleGen::<u16>::create()),
+			Native::U32 => Box::new(SingleGen::<u32>::create()),
+			Native::U64 => Box::new(SingleGen::<u64>::create()),
+			Native::I8 => Box::new(SingleGen::<i8>::create()),
+			Native::I16 => Box::new(SingleGen::<i16>::create()),
+			Native::I32 => Box::new(SingleGen::<i32>::create()),
+			Native::I64 => Box::new(SingleGen::<i64>::create()),
+			Native::Unsigned => Box::new(SingleGen::<u32>::create()),
+			Native::Usize => Box::new(SingleGen::<usize>::create()),
+			Native::Integer => Box::new(SingleGen::<i32>::create()),
+			Native::F32 => Box::new(SingleGen::<f32>::create()),
+			Native::F64 => Box::new(SingleGen::<f64>::create()),
+			Native::Character => Box::new(SingleGen::<char>::create()),
 			Native::Void => unreachable!(),
 		},
 		_ => unreachable!(),
@@ -118,18 +119,26 @@ pub fn generator_single(t: &Type) -> Box<Generator> {
 }
 
 struct SingleGen<T> {
-	val: T,
+	#[allow(dead_code)]
+	unused: T, // if it's missing, Rust complains that 'T' is not used.
 }
-impl<T> SingleGen<T> {
-	pub fn create(value: T) -> Self { SingleGen::<T>{val: value} }
+impl<T: Default> Default for SingleGen<T> {
+	fn default() -> Self { SingleGen::<T>{unused: Default::default()} }
+}
+impl<T: Clone + Default + Display> SingleGen<T> {
+	pub fn create() -> Self { SingleGen::<T>::default() }
 }
 
-impl<T: 'static + Clone + ToString> Generator for SingleGen<T> {
-	// todo fixme: use RTTI to get the type 'T' somehow as a string in the name.
+impl<T: 'static + Clone + Default + ToString> Generator for SingleGen<T> {
 	fn name(&self) -> String {
-		"std:default".to_string() + &self.val.to_string()
+		// todo fixme: get the type 'T' somehow (RTTI?) as a string in the name.
+		let foo: T = Default::default();
+		"std:default".to_string() + &foo.to_string()
 	}
-	fn value(&self) -> String { self.val.to_string() }
+	fn value(&self) -> String {
+		let foo: T = Default::default();
+		foo.to_string()
+	}
 	fn next(&mut self) {}
 	fn done(&self) -> bool { true }
 	fn n_state(&self) -> usize { 1 }
@@ -138,7 +147,7 @@ impl<T: 'static + Clone + ToString> Generator for SingleGen<T> {
 		write!(f, "singlegen{{{} of {}}}", 1, 1)
 	}
 	fn clone(&self) -> Box<Generator> {
-		Box::new(SingleGen::<T>{val: self.val.clone()})
+		Box::new(SingleGen::<T>::default())
 	}
 }
 
