@@ -13,13 +13,13 @@ pub LProgram : api::Program = {
 };
 
 pub LDeclarations : Vec<api::Declaration> = {
-	<decllist: LUDTDecl*> <fvarlist: LFreeVar*> <funclist: LFunc*> => {
+	<decllist: LUDTDecl*> <varlist: LVarDecl*> <funclist: LFunc*> => {
 		let mut rv: Vec<api::Declaration> = Vec::new();
 		for decl in decllist {
 			rv.push(api::Declaration::UDT(decl));
 		}
-		for fvar in fvarlist {
-			rv.push(api::Declaration::Free(fvar));
+		for var in varlist {
+			rv.push(var);
 		}
 		for fqn in funclist {
 			rv.push(api::Declaration::Function(fqn));
@@ -86,14 +86,21 @@ LConstant: ::typ::EnumValue = {
 	}
 };
 
-LFreeVar: api::FreeVarDecl = {
+LVarDecl: api::Declaration = {
 	"var:free" <id: LIdentifier> "gen:std:" <gen: LIdentifier>
 	<typename: LTypeRef> => {
-		api::FreeVarDecl{name: id, genname: "std:".to_string() + &gen, ty: typename}
+		api::Declaration::Free(
+			api::FreeVarDecl{name: id, genname: "std:".to_string() + &gen,
+			                 ty: typename}
+		)
 	},
 	"var:free" <id: LIdentifier> "gen:" <gen: LIdentifier>
 	<typename: LTypeRef> => {
-		api::FreeVarDecl{name: id, genname: gen, ty: typename}
+		api::Declaration::Free(api::FreeVarDecl{name: id, genname: gen,
+		                                        ty: typename})
+	},
+	"var:constrained" <id: LIdentifier> <typeref: LTypeRef> => {
+		api::Declaration::Constrained(id, typeref)
 	},
 };
 

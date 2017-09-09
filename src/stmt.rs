@@ -209,7 +209,7 @@ mod test {
 			let dt = DeclType::Basic($vtype);
 			let fvd = FreeVarDecl{name: $vname.to_string(),
 			                      genname: "".to_string(), ty: dt};
-			Stmt::VarDecl(fvd)
+			Stmt::Declaration(Declaration::Free(fvd))
 		})
 	}
 

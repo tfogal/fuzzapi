@@ -44,6 +44,10 @@ pub struct FuncDecl {
 
 #[derive(Clone, Debug)]
 pub enum Declaration {
+	// "Constrained" variables are the opposite of "free" variables; they might
+	// vary at runtime of the generated program, but the initial value is not a
+	// choice of the fuzzer.
+	Constrained(String /* name */, DeclType),
 	Free(FreeVarDecl),
 	Function(FuncDecl),
 	UDT(DeclType), // Error if the DeclType is not a Struct || Enum!
@@ -61,7 +65,7 @@ pub enum Expr {
 #[derive(Clone, Debug)]
 pub enum Stmt {
 	Basic(Expr),
-	VarDecl(FreeVarDecl),
+	Declaration(Declaration),
 	Assignment(Expr /* LHS */, Expr /* RHS */),
 	Verify(Expr),
 	Constraint(Expr),
@@ -161,6 +165,12 @@ impl Program {
 					let sym = Symbol{name: fvd.name.clone(), generator: gen, typ: ty};
 					self.symtab.push(sym);
 				},
+				Declaration::Constrained(ref nm, ref decl) => {
+					let ty = type_from_decl(decl, &self.typetab);
+					let gen = variable::generator_single(&ty);
+					let sym = Symbol{name: nm.clone(), generator: gen, typ: ty};
+					self.symtab.push(sym);
+				},
 				Declaration::Function(ref fqn) => {
 					let ty = type_from_decl(&fqn.retval, &self.typetab);
 					use variable;
@@ -173,12 +183,31 @@ impl Program {
 		}
 		for ref stmt in self.ast.iter() {
 			match **stmt {
-				Stmt::VarDecl(ref fvd) => {
-					let ty = type_from_decl(&fvd.ty, &self.typetab);
-					let gen = self.genlookup(&ty, &fvd.genname).unwrap();
-					let sym = Symbol{name: fvd.name.clone(), generator: gen,
-					                 typ: ty.clone()};
-					self.symtab.push(sym);
+				Stmt::Declaration(ref decl) => {
+					match *decl {
+						Declaration::Free(ref fvd) => {
+							let ty = type_from_decl(&fvd.ty, &self.typetab);
+							let gen = self.genlookup(&ty, &fvd.genname).unwrap();
+							let sym = Symbol{name: fvd.name.clone(), generator: gen,
+							                 typ: ty.clone()};
+							self.symtab.push(sym);
+						},
+						Declaration::Constrained(ref nm, ref decltype) => {
+							// The only difference between a constrained variable declaration
+							// and a normal variable declaration is that we don't care what
+							// the generated value is for a constrained variable.  These are
+							// the "foo"s in "foo = func();" statements, for example.  We
+							// implement constrained vars the same was as normal vars, just
+							// using a single-state generator.
+							let ty = type_from_decl(&decltype, &self.typetab);
+							let gen = variable::generator_single(&ty);
+							let sym = Symbol{name: nm.clone(), generator: gen,
+							                 typ: ty.clone()};
+							self.symtab.push(sym);
+						},
+						Declaration::Function(_) => (),
+						Declaration::UDT(_) => (),
+					};
 				},
 				_ => (),
 			};
@@ -193,15 +222,26 @@ impl Program {
 					let typ = type_from_decl(&udt, &self.typetab);
 					self.typetab.push(typ);
 				},
+				Declaration::Constrained(_, _) => (),
 				Declaration::Free(_) => (),
 				Declaration::Function(_) => (),
 			};
 		}
 		for ref stmt in self.ast.iter() {
 			match **stmt {
-				Stmt::VarDecl(ref fvd) => {
-					let typ = type_from_decl(&fvd.ty, &self.typetab);
-					self.typetab.push(typ.clone());
+				Stmt::Declaration(ref decltype) => {
+					match *decltype {
+						Declaration::Constrained(_, ref decl) => {
+							let typ = type_from_decl(&decl, &self.typetab);
+							self.typetab.push(typ.clone());
+						},
+						Declaration::Free(ref fvd) => {
+							let typ = type_from_decl(&fvd.ty, &self.typetab);
+							self.typetab.push(typ.clone());
+						},
+						Declaration::Function(_) => (), // right?
+						Declaration::UDT(_) => (), // right?
+					}
 				},
 				_ => (),
 			};
@@ -278,10 +318,21 @@ impl Program {
 					},
 				}
 			},
-			Stmt::VarDecl(ref fvd) => {
-				let sym = self.symlookup(&fvd.name).unwrap();
-				Some(stmt::Statement::VariableDeclaration(sym.name.clone(),
-				                                          sym.typ.clone()))
+			Stmt::Declaration(ref decltype) => {
+				match *decltype {
+					Declaration::Constrained(ref nm, _) => {
+						let sym = self.symlookup(&nm).unwrap();
+						Some(stmt::Statement::VariableDeclaration(sym.name.clone(),
+						                                          sym.typ.clone()))
+					},
+					Declaration::Free(ref fvd) => {
+						let sym = self.symlookup(&fvd.name).unwrap();
+						Some(stmt::Statement::VariableDeclaration(sym.name.clone(),
+						                                          sym.typ.clone()))
+					},
+					Declaration::Function(_) => None, // right?
+					Declaration::UDT(_) => None, // right ?
+				}
 			},
 			Stmt::Assignment(ref lhs, ref rhs) => {
 				let l = self.expr_to_expr(lhs.clone());
@@ -475,7 +526,7 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 					_ => {},
 				};
 			}
-			/* Didn't find it?  Then bail, unknown type! */
+			// Didn't find it?  Then bail, unknown type!
 			if rv == Type::Builtin(Native::Void) {
 				panic!("Unknown struct '{}'!", nm);
 			}
@@ -492,7 +543,7 @@ fn type_from_decl(decl: &DeclType, types: &Vec<Type>) -> Type {
 					_ => {},
 				};
 			}
-			/* Didn't find it?  Then bail, unknown type! */
+			// Didn't find it?  Then bail, unknown type!
 			if rv == Type::Builtin(Native::Void) {
 				panic!("Unknown enum '{}'!", nm);
 			}
