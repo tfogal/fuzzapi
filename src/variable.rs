@@ -98,6 +98,7 @@ pub fn generator_single(t: &Type) -> Box<Generator> {
 	match *t {
 		Type::Function(_) => unimplemented!(),
 		Type::Builtin(ref nat) => match *nat {
+			Native::Boolean => Box::new(SingleGen::<bool>::create()),
 			Native::U8 => Box::new(SingleGen::<u8>::create()),
 			Native::U16 => Box::new(SingleGen::<u16>::create()),
 			Native::U32 => Box::new(SingleGen::<u32>::create()),

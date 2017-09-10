@@ -6,6 +6,7 @@ pub enum Native {
 	U8, U16, U32, U64, Unsigned, Usize,
 	I8, I16, I32, I64, Integer,
 	F32, F64,
+	Boolean,
 	Character,
 	Void,
 }
@@ -111,6 +112,7 @@ impl Name for Native {
 			&Native::F32 => "float", &Native::F64 => "double",
 			&Native::Usize => "size_t", &Native::Integer => "int",
 			&Native::Unsigned => "unsigned",
+			&Native::Boolean => "bool",
 			&Native::Character => "char",
 			&Native::Void => "void",
 		}.to_string()
