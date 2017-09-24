@@ -9,7 +9,7 @@ use std;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
-use opcode::Opcode;
+use opcode::{BinOp, Op, UOp};
 use variable;
 use variable::Generator;
 
@@ -55,11 +55,11 @@ pub enum Declaration {
 
 #[derive(Clone, Debug)]
 pub enum Expr {
-	VarRef(variable::ScalarOp, String /* varname */),
+	VarRef(UOp, String /* varname */),
 	IConst(String),
 	FConst(String),
 	Call(String /* funcname */, Box<Vec<Expr>> /* args */),
-	Compound(Box<Expr>, Opcode, Box<Expr>),
+	Compound(Box<Expr>, BinOp, Box<Expr>),
 	Field(String, String),
 }
 #[derive(Clone, Debug)]

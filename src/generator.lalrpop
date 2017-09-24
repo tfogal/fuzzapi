@@ -73,19 +73,19 @@ LExpression: usergen::Expression = {
 	// allow all of the above expressions as the RHS of all the following
 	// expressions, and such recursion *requires* precedence specification.
 	<left: LExpression> "+" <right: LFactor> =>
-		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Add,
+		usergen::Expression::Compound(Box::new(left), opcode::BinOp::Add,
 		                             Box::new(right)),
 	<left: LExpression> "-" <right: LFactor> =>
-		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Sub,
+		usergen::Expression::Compound(Box::new(left), opcode::BinOp::Sub,
 		                             Box::new(right)),
 	<left: LExpression> "/" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Div,
+		usergen::Expression::Compound(Box::new(left), opcode::BinOp::Div,
 		                             Box::new(right)),
 	<left: LExpression> "*" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Mul,
+		usergen::Expression::Compound(Box::new(left), opcode::BinOp::Mul,
 		                             Box::new(right)),
 	<left: LFactor> "%" <right: LTerm> =>
-		usergen::Expression::Compound(Box::new(left), opcode::Opcode::Mod,
+		usergen::Expression::Compound(Box::new(left), opcode::BinOp::Mod,
 		                             Box::new(right)),
 };
 

@@ -3,8 +3,7 @@ use std::io::{Error};
 use api::*;
 use function::*;
 use typ::*;
-use opcode::Opcode;
-use variable;
+use opcode::{BinOp, UOp};
 
 // Code is anything we can generate code for.
 pub trait Code {
@@ -14,10 +13,10 @@ pub trait Code {
 
 #[derive(Clone,Debug)]
 pub enum Expression {
-	Basic(variable::ScalarOp, Symbol),
+	Basic(UOp, Symbol),
 	IConstant(i64),
 	FConstant(f64),
-	Compound(Box<Expression>, Opcode, Box<Expression>),
+	Compound(Box<Expression>, BinOp, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
 	// of statements.  Then any expression, no matter how trivial, is a
 	// Statement. This has the slightly undesirable property that "variable;" is
@@ -32,11 +31,15 @@ impl Expression {
 	pub fn extype(&self) -> Type {
 		match self {
 			&Expression::Basic(ref op, ref src) => {
-				match op {
-					&variable::ScalarOp::Null => src.typ.clone(),
-					&variable::ScalarOp::Deref => src.typ.dereference(),
-					&variable::ScalarOp::AddressOf =>
-						Type::Pointer(Box::new(src.typ.clone())),
+				match *op {
+					UOp::AddressOf => Type::Pointer(Box::new(src.typ.clone())),
+					UOp::Deref => src.typ.dereference(),
+					UOp::Negate => {
+						println!("FIXME negate of unsigned type should be signed.");
+						src.typ.clone()
+					},
+					UOp::None => src.typ.clone(),
+					UOp::Not => src.typ.clone(),
 				}
 			},
 			&Expression::IConstant(_) => {
@@ -192,6 +195,7 @@ impl Code for Statement {
 mod test {
 	use super::*;
 	use variable::*;
+	use variable;
 
 	macro_rules! cg_expect {
 		($left:expr, $expected:expr, $pgm:expr) => (
@@ -224,7 +228,7 @@ mod test {
 		pgm.set_generators(&g);
 		pgm.analyze().unwrap();
 
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let varname = pgm.symlookup("varname").unwrap();
 		let expr = Expression::Basic(null, varname.clone());
 		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
@@ -232,14 +236,14 @@ mod test {
 		drop(expr);
 
 		// make sure address of affects codegen.
-		let addrof = variable::ScalarOp::AddressOf;
+		let addrof = UOp::AddressOf;
 		let v2 = pgm.symlookup("var2").unwrap();
 		let expr = Expression::Basic(addrof, v2.clone());
 		cg_expect!(expr, "&var2", pgm);
 		drop(expr);
 
 		// make sure deref affects codegen.
-		let addrof = variable::ScalarOp::Deref;
+		let addrof = UOp::Deref;
 		let v3 = pgm.symlookup("var3").unwrap();
 		let expr = Expression::Basic(addrof, v3.clone());
 		cg_expect!(expr, "*var3", pgm);
@@ -261,16 +265,16 @@ mod test {
 		pgm.analyze().unwrap();
 		let l = pgm.symlookup("LHS").unwrap();
 		let r = pgm.symlookup("RHS").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let el = Box::new(Expression::Basic(null, l.clone()));
 		let er = Box::new(Expression::Basic(null, r.clone()));
-		compoundtest!(pgm, el, Opcode::Add, er, "LHS + RHS");
-		compoundtest!(pgm, el, Opcode::Sub, er, "LHS - RHS");
-		compoundtest!(pgm, el, Opcode::Mul, er, "LHS * RHS");
-		compoundtest!(pgm, el, Opcode::Div, er, "LHS / RHS");
-		compoundtest!(pgm, el, Opcode::Mod, er, "LHS % RHS");
-		compoundtest!(pgm, el, Opcode::LAnd, er, "LHS && RHS");
-		compoundtest!(pgm, el, Opcode::LOr, er, "LHS || RHS");
+		compoundtest!(pgm, el, BinOp::Add, er, "LHS + RHS");
+		compoundtest!(pgm, el, BinOp::Sub, er, "LHS - RHS");
+		compoundtest!(pgm, el, BinOp::Mul, er, "LHS * RHS");
+		compoundtest!(pgm, el, BinOp::Div, er, "LHS / RHS");
+		compoundtest!(pgm, el, BinOp::Mod, er, "LHS % RHS");
+		compoundtest!(pgm, el, BinOp::LAnd, er, "LHS && RHS");
+		compoundtest!(pgm, el, BinOp::LOr, er, "LHS || RHS");
 	}
 
 	#[test]
@@ -282,7 +286,7 @@ mod test {
 			vardecl!("Vb", Type::Builtin(Native::I32)),
 		]);
 		pgm.analyze().unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let va = Expression::Basic(null, pgm.symlookup("Va").unwrap().clone());
 		let vb = Expression::Basic(null, pgm.symlookup("Vb").unwrap().clone());
 		let fvar = Expression::Basic(null, pgm.symlookup("Fv").unwrap().clone());
@@ -316,14 +320,14 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let src = pgm.symlookup("a").unwrap();
 		let expr = Expression::Basic(null, src.clone());
 		let sstmt = Statement::Expr(expr);
 		cg_expect!(sstmt, "a;", pgm);
 		drop(sstmt); drop(src);
 
-		let drf = variable::ScalarOp::Deref;
+		let drf = UOp::Deref;
 		let src = pgm.symlookup("b").unwrap();
 		let expr = Expression::Basic(drf, src.clone());
 		let sstmt = Statement::Expr(expr);
@@ -340,7 +344,7 @@ mod test {
 		pgm.analyze().unwrap();
 		let dst = pgm.symlookup("a").unwrap();
 		let src = pgm.symlookup("b").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let srcexp = Expression::Basic(null, src.clone());
 		let dstexp = Expression::Basic(null, dst.clone());
 		let sstmt = Statement::Assignment(dstexp, srcexp);
@@ -354,7 +358,7 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 		let vara = pgm.symlookup("a").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let expr = Expression::Basic(null, vara.clone());
 		let vstmt = Statement::Verify(expr);
 		cg_expect!(vstmt, "assert(a);", pgm);
@@ -367,10 +371,10 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 		let vara = pgm.symlookup("a").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let lhs = Expression::Basic(null, vara.clone());
 		let rhs = Expression::IConstant(0);
-		let expr = Expression::Compound(Box::new(lhs), Opcode::Greater,
+		let expr = Expression::Compound(Box::new(lhs), BinOp::Greater,
 		                                Box::new(rhs));
 		let cnstrnt = Statement::Constraint(expr);
 		cg_expect!(cnstrnt, "if(!(a > 0)) {\n\texit(EXIT_SUCCESS);\n}", pgm);
@@ -402,7 +406,7 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 		let vara = pgm.symlookup("a").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let simple = Expression::Basic(null, vara.clone());
 		let ifst = Statement::If(simple, Box::new(vec![]));
 		cg_expect!(ifst, "if(a) {\n}\n", pgm);
@@ -415,7 +419,7 @@ mod test {
 		]);
 		pgm.analyze().unwrap();
 		let varfoo = pgm.symlookup("foo").unwrap();
-		let null = variable::ScalarOp::Null;
+		let null = UOp::None;
 		let simple = Expression::Basic(null, varfoo.clone());
 		let ifst = Statement::While(simple, Box::new(vec![]));
 		cg_expect!(ifst, "while(foo) {\n}\n", pgm);

@@ -104,13 +104,13 @@ LVarDecl: api::Declaration = {
 	},
 };
 
-LScalarOperation: variable::ScalarOp = {
-	"op:null" => variable::ScalarOp::Null,
-	"op:*" => variable::ScalarOp::Deref,
-	"op:deref" => variable::ScalarOp::Deref,
-	"op:&" => variable::ScalarOp::AddressOf,
-	"op:addressof" => variable::ScalarOp::AddressOf,
-	"&" => variable::ScalarOp::AddressOf,
+LScalarOperation: opcode::UOp = {
+	"op:null" => opcode::UOp::None,
+	"op:*" => opcode::UOp::Deref,
+	"op:deref" => opcode::UOp::Deref,
+	"op:&" => opcode::UOp::AddressOf,
+	"op:addressof" => opcode::UOp::AddressOf,
+	"&" => opcode::UOp::AddressOf,
 };
 
 LFunc: api::FuncDecl = {
@@ -126,38 +126,38 @@ LArgTy: api::DeclType = {
 	},
 };
 
-LBinOp: opcode::Opcode = {
-	"+" => opcode::Opcode::Add,
-	"-" => opcode::Opcode::Sub,
-	"*" => opcode::Opcode::Mul,
-	"/" => opcode::Opcode::Div,
-	"%" => opcode::Opcode::Mod,
-	"&&" => opcode::Opcode::LAnd,
-	"||" => opcode::Opcode::LOr,
-	">" => opcode::Opcode::Greater,
-	"<" => opcode::Opcode::Less,
+LBinOp: opcode::BinOp = {
+	"+" => opcode::BinOp::Add,
+	"-" => opcode::BinOp::Sub,
+	"*" => opcode::BinOp::Mul,
+	"/" => opcode::BinOp::Div,
+	"%" => opcode::BinOp::Mod,
+	"&&" => opcode::BinOp::LAnd,
+	"||" => opcode::BinOp::LOr,
+	">" => opcode::BinOp::Greater,
+	"<" => opcode::BinOp::Less,
 };
 
-LAddSub: opcode::Opcode = {
-	"+" => opcode::Opcode::Add,
-	"-" => opcode::Opcode::Sub,
+LAddSub: opcode::BinOp = {
+	"+" => opcode::BinOp::Add,
+	"-" => opcode::BinOp::Sub,
 };
-LMulDiv: opcode::Opcode = {
-	"*" => opcode::Opcode::Mul,
-	"/" => opcode::Opcode::Div,
-	"%" => opcode::Opcode::Mod,
+LMulDiv: opcode::BinOp = {
+	"*" => opcode::BinOp::Mul,
+	"/" => opcode::BinOp::Div,
+	"%" => opcode::BinOp::Mod,
 };
-LLogical: opcode::Opcode = {
-	"&&" => opcode::Opcode::LAnd,
-	"||" => opcode::Opcode::LOr,
+LLogical: opcode::BinOp = {
+	"&&" => opcode::BinOp::LAnd,
+	"||" => opcode::BinOp::LOr,
 };
 // We should technically separate out Eq/Ne because they should have lower
 // precedence than other relational ops.  But for now ...
-LRelational: opcode::Opcode = {
-	">" => opcode::Opcode::Greater,
-	"<" => opcode::Opcode::Less,
-	"==" => opcode::Opcode::Equal,
-	"!=" => opcode::Opcode::NotEqual,
+LRelational: opcode::BinOp = {
+	">" => opcode::BinOp::Greater,
+	"<" => opcode::BinOp::Less,
+	"==" => opcode::BinOp::Equal,
+	"!=" => opcode::BinOp::NotEqual,
 };
 
 LTypeRef: api::DeclType = {
@@ -236,7 +236,7 @@ LTerm: api::Expr = {
 		api::Expr::VarRef(sop, id)
 	},
 	<id: LIdentifier> => {
-		let sop = variable::ScalarOp::Null;
+		let sop = opcode::UOp::None;
 		api::Expr::VarRef(sop, id)
 	},
 	"function:call" <id: LIdentifier> "{" <args: LExpr*> "}" => {

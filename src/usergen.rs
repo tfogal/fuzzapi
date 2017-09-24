@@ -3,7 +3,7 @@ extern crate rand;
 use std::fmt;
 use rand::distributions::{IndependentSample, Range};
 
-use opcode::Opcode;
+use opcode::BinOp;
 use typ::*;
 use variable::Generator;
 
@@ -68,19 +68,20 @@ impl UserGen {
 				// Hack: we assume i64 is sufficient for everything ...
 				let lhs = l.parse::<i64>().unwrap();
 				let rhs = r.parse::<i64>().unwrap();
-				let result = match op {
-					&Opcode::Add => lhs + rhs,
-					&Opcode::Sub => lhs - rhs,
-					&Opcode::Mul => lhs * rhs,
-					&Opcode::Div => lhs / rhs,
-					&Opcode::Mod => lhs % rhs,
-					&Opcode::LAnd => (lhs > 0 && rhs > 0) as i64,
-					&Opcode::LOr => (lhs > 0 || rhs > 0) as i64,
-					&Opcode::Greater => (lhs > rhs) as i64,
-					&Opcode::Less => (lhs < rhs) as i64,
-					&Opcode::NotEqual => (lhs != rhs) as i64,
-					&Opcode::Equal => (lhs == rhs) as i64,
-					&Opcode::Not => unreachable!(),
+				let result = match *op {
+					BinOp::Add => lhs + rhs,
+					BinOp::Sub => lhs - rhs,
+					BinOp::Mul => lhs * rhs,
+					BinOp::Div => lhs / rhs,
+					BinOp::Mod => lhs % rhs,
+					BinOp::LAnd => (lhs > 0 && rhs > 0) as i64,
+					BinOp::LOr => (lhs > 0 || rhs > 0) as i64,
+					BinOp::Greater => (lhs > rhs) as i64,
+					BinOp::GreaterEqual => (lhs >= rhs) as i64,
+					BinOp::Less => (lhs < rhs) as i64,
+					BinOp::LessEqual => (lhs <= rhs) as i64,
+					BinOp::NotEqual => (lhs != rhs) as i64,
+					BinOp::Equal => (lhs == rhs) as i64,
 				};
 				result.to_string()
 			},
@@ -108,42 +109,44 @@ impl fmt::Debug for UserGen {
 #[derive(Clone)]
 pub enum Expression {
 	ConstExpr(Constant),
-	Compound(Box<Expression>, Opcode, Box<Expression>),
+	Compound(Box<Expression>, BinOp, Box<Expression>),
 	MinExpr(Type), // i.e. "i32:min()"
 	MaxExpr(Type),
 	RandomExpr(Type, Box<Expression>, Box<Expression>), // exprs are low and high
 }
 impl fmt::Debug for Expression {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			&Expression::ConstExpr(ref expr) => write!(f, "Constant({:?})", expr),
-			&Expression::Compound(ref left, Opcode::Add, ref right) =>
+		match *self {
+			Expression::ConstExpr(ref expr) => write!(f, "Constant({:?})", expr),
+			Expression::Compound(ref left, BinOp::Add, ref right) =>
 				write!(f, "{:?} + {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Sub, ref right) =>
+			Expression::Compound(ref left, BinOp::Sub, ref right) =>
 				write!(f, "{:?} - {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Mul, ref right) =>
+			Expression::Compound(ref left, BinOp::Mul, ref right) =>
 				write!(f, "{:?} * {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Div, ref right) =>
+			Expression::Compound(ref left, BinOp::Div, ref right) =>
 				write!(f, "{:?} / {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Mod, ref right) =>
+			Expression::Compound(ref left, BinOp::Mod, ref right) =>
 				write!(f, "{:?} % {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::LAnd, ref right) =>
+			Expression::Compound(ref left, BinOp::LAnd, ref right) =>
 				write!(f, "{:?} && {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::LOr, ref right) =>
+			Expression::Compound(ref left, BinOp::LOr, ref right) =>
 				write!(f, "{:?} || {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Greater, ref right) =>
+			Expression::Compound(ref left, BinOp::Greater, ref right) =>
 				write!(f, "{:?} > {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Less, ref right) =>
+			Expression::Compound(ref left, BinOp::GreaterEqual, ref right) =>
+				write!(f, "{:?} >= {:?}", left, right),
+			Expression::Compound(ref left, BinOp::Less, ref right) =>
 				write!(f, "{:?} < {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::NotEqual, ref right) =>
+			Expression::Compound(ref left, BinOp::LessEqual, ref right) =>
+				write!(f, "{:?} <= {:?}", left, right),
+			Expression::Compound(ref left, BinOp::NotEqual, ref right) =>
 				write!(f, "{:?} != {:?}", left, right),
-			&Expression::Compound(ref left, Opcode::Equal, ref right) =>
+			Expression::Compound(ref left, BinOp::Equal, ref right) =>
 				write!(f, "{:?} == {:?}", left, right),
-			&Expression::Compound(_, Opcode::Not, _) =>
-				unreachable!(),
-			&Expression::MinExpr(ref ty) => write!(f, "{}:min()", ty.name()),
-			&Expression::MaxExpr(ref ty) => write!(f, "{}:max()", ty.name()),
-			&Expression::RandomExpr(ref ty, ref low, ref high) =>
+			Expression::MinExpr(ref ty) => write!(f, "{}:min()", ty.name()),
+			Expression::MaxExpr(ref ty) => write!(f, "{}:max()", ty.name()),
+			Expression::RandomExpr(ref ty, ref low, ref high) =>
 				write!(f, "{}:random[{:?}, {:?})", ty.name(), low, high),
 		}
 	}
