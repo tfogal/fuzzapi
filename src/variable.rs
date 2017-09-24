@@ -8,25 +8,6 @@ use rand::distributions::{IndependentSample, Range};
 use typ::*;
 use tc::*;
 
-// A variable has a root type, but when used in functions it may need to be
-// transformed in some way.  The classic example is a stack variable that needs
-// address-of to be passed to a method that accepts it by pointer.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ScalarOp {
-	Null, // no transformation needed
-	Deref, // dereference it once
-	AddressOf, // apply the address-of operator
-}
-impl ToString for ScalarOp {
-	fn to_string(&self) -> String {
-		match self {
-			&ScalarOp::Null => "".to_string(),
-			&ScalarOp::Deref => "*".to_string(),
-			&ScalarOp::AddressOf => "&".to_string(),
-		}
-	}
-}
-
 // A Generator holds TypeClass information and helps us iterate through the
 // class of all values by knowing where we are in that sequence.
 pub trait Generator {
