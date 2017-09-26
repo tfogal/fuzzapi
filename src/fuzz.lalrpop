@@ -114,7 +114,7 @@ LScalarOperation: opcode::UOp = {
 };
 
 LFunc: api::FuncDecl = {
-	"function:new" <nm: LIdentifier> <rtype: LTypeRef> "{" <arg: LArgTy*> "}"
+	"function:decl" <nm: LIdentifier> <rtype: LTypeRef> "{" <arg: LArgTy*> "}"
 		=> {
 		api::FuncDecl{name: nm, retval: rtype, arguments: arg}
 	},

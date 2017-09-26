@@ -701,7 +701,7 @@ mod test {
 
 	#[test]
 	fn parse_function_new() {
-		let s = "function:new hcreate_r int {usize, pointer struct hsearch_data,}";
+		let s = "function:decl hcreate_r int {usize, pointer struct hsearch_data,}";
 		let decls: Vec<api::Declaration> = match fuzz::parse_LDeclarations(s) {
 			Ok(parsed) => parsed,
 			Err(e) => panic!("{:?}", e),
@@ -744,10 +744,10 @@ mod test {
 
 	#[test]
 	fn parse_two_function_decls() {
-		let s = "function:new hcreate_r int {".to_string() +
+		let s = "function:decl hcreate_r int {".to_string() +
 			"usize, pointer struct hsearch_data," +
 		"}" +
-		"function:new hsearch_r int {" +
+		"function:decl hsearch_r int {" +
 			"int, int, pointer pointer int, pointer struct hsearch_data," +
 		"}";
 		let decls: Vec<api::Declaration> =
@@ -767,7 +767,7 @@ mod test {
 	fn opaque_struct_in_function() {
 		let s = "struct hsearch_data {}\n".to_string() +
 		"var:free tbl gen:opaque struct hsearch_data\n" +
-		"function:new hcreate_r int {" +
+		"function:decl hcreate_r int {" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n";
 		let decls: Vec<api::Declaration> =

@@ -256,10 +256,10 @@ fn main() {
 		"var:free actvar gen:Enum enum ACTION\n" +
 		// note the API has a fqn argument named "retval"!
 		"var:free retval gen:udt pointer struct entry\n" +
-		"function:new hcreate_r int {\n" +
+		"function:decl hcreate_r int {\n" +
 			"usize, pointer struct hsearch_data,\n" +
 		"}\n" +
-		"function:new hsearch_r int {\n" +
+		"function:decl hsearch_r int {\n" +
 			"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 		"}\n" +
 		"constraint:new item.key != 0\n" +
@@ -338,10 +338,10 @@ mod test {
 			"var:free actvar gen:Enum enum ACTION\n" +
 			// note the API has a fqn argument named "retval"!
 			"var:free retval gen:udt pointer struct entry\n" +
-			"function:new hcreate_r int {\n" +
+			"function:decl hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +
-			"function:new hsearch_r int {\n" +
+			"function:decl hsearch_r int {\n" +
 				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 			"}\n" +
 			"function:call hcreate_r { nel op:& tbl }\n" +
@@ -357,10 +357,10 @@ mod test {
 			"leaf = 3 , \n" +
 		"}\n" +
 		"var:free nvalues gen:Usize usize\n" +
-		"function:new my_compare int {\n" +
+		"function:decl my_compare int {\n" +
 			"pointer void, pointer void,\n" +
 		"}\n" +
-		"function:new action void {\n" +
+		"function:decl action void {\n" +
 		"	pointer void, enum VISIT, int,\n" +
 		"}\n" +
 		"constraint:new nvalues < 42\n"
@@ -380,7 +380,7 @@ mod test {
 		let s = "struct hsearch_data {}\n".to_string() +
 			"var:free nel gen:Usize usize\n" +
 			"var:free tbl gen:opaque struct hsearch_data\n" +
-			"function:new hcreate_r int {\n" +
+			"function:decl hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +
 			"function:call hcreate_r { nel op:& tbl }\n";
@@ -422,10 +422,10 @@ mod test {
 	fn parse_hash_decls() {
 		let s = "struct hsearch_data {}\n".to_string() +
 			"var:free tbl gen:opaque struct hsearch_data\n" +
-			"function:new hcreate_r int {\n" +
+			"function:decl hcreate_r int {\n" +
 				"usize, pointer struct hsearch_data,\n" +
 			"}\n" +
-			"function:new hsearch_r int {\n" +
+			"function:decl hsearch_r int {\n" +
 				"int, int, pointer pointer int, pointer struct hsearch_data,\n" +
 			"}";
 		match fuzz::parse_LProgram(s.as_str()) {
@@ -490,7 +490,7 @@ mod test {
 	#[test]
 	fn if_statement() {
 		let s = "var:free vtest gen:Usize usize\n".to_string() +
-			"function:new printf int { usize, }\n" + // hack ...
+			"function:decl printf int { usize, }\n" + // hack ...
 			"if(vtest > 42) {\n" +
 			"  function:call printf { vtest }\n" +
 			"}\n";
