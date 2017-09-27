@@ -2,7 +2,6 @@
 use api;
 use typ::{Native, Type};
 use opcode;
-use variable;
 
 grammar;
 
