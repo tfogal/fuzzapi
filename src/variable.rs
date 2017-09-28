@@ -2,7 +2,7 @@
 //   ScalarOp: transformation to apply to a variable to use in the context a
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 extern crate rand;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
@@ -13,6 +13,10 @@ use tc::*;
 pub trait Generator {
 	// The name of this generator, as a user might invoke it.
 	fn name(&self) -> String;
+
+	// Given a variable name, return a statement that declares a variable using
+	// the initial state of this generator.
+	fn decl(&self, varname: &str) -> String;
 
 	// Grabs the current state as an expression.
 	fn value(&self) -> String;
@@ -117,6 +121,13 @@ impl<T: 'static + Clone + Default + ToString> Generator for SingleGen<T> {
 		let foo: T = Default::default();
 		"std:default".to_string() + &foo.to_string()
 	}
+	fn decl(&self, varname: &str) -> String {
+		let foo: T = Default::default();
+		let mut rv = String::new();
+		write!(&mut rv, "{} {} = {}", stringify!(T), varname,
+		       foo.to_string()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		let foo: T = Default::default();
 		foo.to_string()
@@ -146,6 +157,8 @@ pub struct GenNothing {}
 // functions and have it make sense ...
 impl Generator for GenNothing {
 	fn name(&self) -> String { "std:nothing".to_string() }
+	#[allow(unused_variables)]
+	fn decl(&self, ignored: &str) -> String { unimplemented!(); }
 	fn value(&self) -> String { panic!("Null generator called"); }
 	fn next(&mut self) { panic!("Null generator can't advance"); }
 	fn done(&self) -> bool { return true; }
@@ -174,9 +187,13 @@ impl Generator for GenOpaque {
 	fn name(&self) -> String {
 		"std:opaque:".to_string() + self.ty.name().as_str()
 	}
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "{} = /*({})*/{{}}", varname, self.ty.name()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		let mut rv = String::new();
-		use std::fmt::Write;
 		write!(&mut rv, "/*({})*/{{}}", self.ty.name()).unwrap();
 		return rv;
 	}
@@ -195,17 +212,24 @@ pub struct GenEnum {
 	name: String,
 	cls: TC_Enum,
 	idx: usize, // index into the list of values that this enum can take on
+	typename: String
 }
 
 impl GenEnum {
 	pub fn create(t: &Type) -> Self {
 		GenEnum{name: "std:enum:".to_string() + t.name().as_str(),
-		        cls: TC_Enum::new(t), idx: 0}
+		        cls: TC_Enum::new(t), idx: 0, typename: t.name()}
 	}
 }
 
 impl Generator for GenEnum {
 	fn name(&self) -> String { self.name.clone() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "enum {} {} = {}", self.typename, varname,
+		       self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -228,7 +252,7 @@ impl Generator for GenEnum {
 	}
 	fn clone(&self) -> Box<Generator> {
 		Box::new(GenEnum{name: self.name.clone(), cls: self.cls.clone(),
-		                 idx: self.idx})
+		                 idx: self.idx, typename: self.typename.clone()})
 	}
 }
 
@@ -246,6 +270,11 @@ impl GenI32 {
 
 impl Generator for GenI32 {
 	fn name(&self) -> String { "std:I32orig".to_string() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "int32_t {} = {}", varname, self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		return self.cls.value(self.idx).to_string();
 	}
@@ -285,9 +314,13 @@ impl GenUsize {
 
 impl Generator for GenUsize {
 	fn name(&self) -> String { "std:usize".to_string() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "size_t {} = {}", varname, self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		let mut rv = String::new();
-		use std::fmt::Write;
 		write!(&mut rv, "{}ull", self.cls.value(self.idx).to_string()).unwrap();
 		return rv;
 	}
@@ -318,6 +351,7 @@ pub struct GenStruct {
 	fields: Vec<Field>,
 	values: Vec<Box<Generator>>,
 	idx: Vec<usize>,
+	typename: String,
 }
 
 impl GenStruct {
@@ -347,6 +381,8 @@ impl GenStruct {
 			values: val,
 			// we need a vector of 0s the same size as 'values' or 'fields'
 			idx: (0..nval).map(|_| 0).collect(),
+			typename: match *t { Type::Struct(ref nm, _) => nm.clone(),
+			                     _ => panic!("not a struct.") },
 		}
 	}
 
@@ -361,8 +397,13 @@ impl GenStruct {
 
 impl Generator for GenStruct {
 	fn name(&self) -> String { "std:Struct".to_string() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "struct {} {} = {}", self.typename, varname,
+		       self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
-		use std::fmt::Write;
 		let mut rv = String::new();
 
 		write!(&mut rv, "{{\n").unwrap();
@@ -419,7 +460,8 @@ impl Generator for GenStruct {
 	}
 	fn clone(&self) -> Box<Generator> {
 		Box::new(GenStruct{fields: self.fields.clone(),
-		                   values: self.clone_values(), idx: self.idx.clone()})
+		                   values: self.clone_values(), idx: self.idx.clone(),
+		                   typename: self.typename.clone()})
 	}
 }
 
@@ -442,9 +484,14 @@ impl GenPointer {
 
 impl Generator for GenPointer {
 	fn name(&self) -> String { "std:pointer".to_string() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "{}* {} = {}", self.ty.name(), varname,
+		       self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		let mut rv = String::new();
-		use std::fmt::Write;
 		write!(&mut rv, "({}){}ull", self.ty.name(),
 		       self.cls.value(self.idx).to_string()).unwrap();
 		return rv;
@@ -524,13 +571,17 @@ impl GenCString {
 
 impl Generator for GenCString {
 	fn name(&self) -> String { "std:cstring".to_string() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(rv, "char* {} = {}", varname, self.value()).unwrap();
+		return rv;
+	}
 	fn value(&self) -> String {
 		// special case null, so that we can wrap all other cases in "".
 		if self.idx == 0 {
 			return "NULL".to_string();
 		}
 
-		use std::fmt::Write;
 		let mut rv = String::new();
 		write!(&mut rv, "\"").unwrap();
 		assert!(self.idx < 8);
@@ -616,6 +667,13 @@ impl GenIgnore {
 }
 impl Generator for GenIgnore {
 	fn name(&self) -> String { self.name.clone() }
+	// This is wrong.  If we're supposed to ignore index 0, but the subgen uses
+	// self.value() in ITS implementation of decl(), then we'll initialize it
+	// with the supposed-to-be-ignored 0 value().
+	fn decl(&self, varname: &str) -> String {
+		assert!(self.ign != 0);
+		self.subgen.decl(varname)
+	}
 	fn value(&self) -> String { self.subgen.value() }
 
 	fn next(&mut self) {

@@ -180,6 +180,14 @@ impl fmt::Debug for Constant {
 
 impl ::variable::Generator for UserGen {
 	fn name(&self) -> String { self.name.clone() }
+	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		use std::fmt::Write;
+		write!(&mut rv, "{} {} = {}", self.ty.name(), varname,
+		       self.value()).unwrap();
+		return rv;
+	}
+
 	fn value(&self) -> String {
 		let i = self.idx;
 		let expr: Expression = self.states[i].clone();
