@@ -189,7 +189,8 @@ impl Generator for GenOpaque {
 	}
 	fn decl(&self, varname: &str) -> String {
 		let mut rv = String::new();
-		write!(&mut rv, "{} = /*({})*/{{}}", varname, self.ty.name()).unwrap();
+		write!(&mut rv, "{} {} = /*({})*/{{}}", self.ty.name(), varname,
+		       self.ty.name()).unwrap();
 		return rv;
 	}
 	fn value(&self) -> String {
@@ -226,7 +227,7 @@ impl Generator for GenEnum {
 	fn name(&self) -> String { self.name.clone() }
 	fn decl(&self, varname: &str) -> String {
 		let mut rv = String::new();
-		write!(&mut rv, "enum {} {} = {}", self.typename, varname,
+		write!(&mut rv, "{} {} = {}", self.typename, varname,
 		       self.value()).unwrap();
 		return rv;
 	}
@@ -486,7 +487,8 @@ impl Generator for GenPointer {
 	fn name(&self) -> String { "std:pointer".to_string() }
 	fn decl(&self, varname: &str) -> String {
 		let mut rv = String::new();
-		write!(&mut rv, "{}* {} = {}", self.ty.name(), varname,
+		// note that we don't need a '*' here because it is part of the type.
+		write!(&mut rv, "{} {} = {}", self.ty.name(), varname,
 		       self.value()).unwrap();
 		return rv;
 	}
