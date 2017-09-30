@@ -94,11 +94,6 @@ impl BinOp {
 	}
 }
 
-pub enum Op {
-	Unary(UOp),
-	Binary(BinOp),
-}
-
 impl fmt::Display for UOp {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
@@ -127,15 +122,6 @@ impl fmt::Display for BinOp {
 			BinOp::LessEqual => write!(f, "<="),
 			BinOp::NotEqual => write!(f, "!="),
 			BinOp::Equal => write!(f, "=="),
-		}
-	}
-}
-
-impl fmt::Display for Op {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match *self {
-			Op::Unary(ref uop) => write!(f, "{}", uop),
-			Op::Binary(ref bop) => write!(f, "{}", bop),
 		}
 	}
 }

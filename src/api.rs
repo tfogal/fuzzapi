@@ -9,7 +9,7 @@ use std;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
-use opcode::{BinOp, Op, UOp};
+use opcode::{BinOp, UOp};
 use variable;
 use variable::Generator;
 
