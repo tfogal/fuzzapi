@@ -136,7 +136,7 @@ impl Code for Statement {
 			&Statement::VariableDeclaration(ref nm, ref typ) => {
 				let sym = pgm.symlookup(nm).unwrap();
 				assert_eq!(sym.name, *nm);
-				write!(strm, "{} {} = {};", typ.name(), nm, sym.generator.value())
+				write!(strm, "{};", sym.generator.decl(nm))
 			},
 			&Statement::Expr(ref expr) => {
 				try!(expr.codegen(strm, pgm));
