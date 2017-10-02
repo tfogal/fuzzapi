@@ -709,6 +709,31 @@ impl Generator for GenIgnore {
 	}
 }
 
+// a generator for a hypothetical graph API.
+pub struct FauxGraph {
+}
+impl Generator for FauxGraph {
+	fn name(&self) -> String { "gen:faux-graph".to_string() }
+	#[allow(unused_variables)]
+	fn decl(&self, varname: &str) -> String {
+		unreachable!();
+	}
+	fn value(&self) -> String {
+		"foo".to_string()
+	}
+	fn next(&mut self) {}
+	fn done(&self) -> bool { true }
+	fn n_state(&self) -> usize { 1 }
+	fn reset(&mut self) {}
+	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "FauxGraph{{...}}")
+	}
+	// Workaround because we can't clone() a trait, or a Box<> of one.
+	fn clone(&self) -> Box<Generator> {
+		Box::new(FauxGraph{})
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use variable::{generator, Generator};
