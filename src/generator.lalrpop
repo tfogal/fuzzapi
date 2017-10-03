@@ -25,14 +25,14 @@ LGeneratorName: String = {
 
 LType: String = {
 	// Can we do case-insensitive matching with LALRPop?
-	"I8" => "I8".to_string(), "i8" => "i8".to_string(),
-	"I16" => "I16".to_string(), "i16" => "i16".to_string(),
-	"I32" => "I32".to_string(), "i32" => "i32".to_string(),
-	"I64" => "I64".to_string(), "i64" => "i64".to_string(),
-	"U8" => "U8".to_string(), "u8" => "u8".to_string(),
-	"U16" => "U16".to_string(), "u16" => "u16".to_string(),
-	"U32" => "U32".to_string(), "u32" => "u32".to_string(),
-	"U64" => "U64".to_string(), "u64" => "u64".to_string(),
+	"I8" => "i8".to_string(), "i8" => "i8".to_string(),
+	"I16" => "i16".to_string(), "i16" => "i16".to_string(),
+	"I32" => "i32".to_string(), "i32" => "i32".to_string(),
+	"I64" => "i64".to_string(), "i64" => "i64".to_string(),
+	"U8" => "u8".to_string(), "u8" => "u8".to_string(),
+	"U16" => "u16".to_string(), "u16" => "u16".to_string(),
+	"U32" => "u32".to_string(), "u32" => "u32".to_string(),
+	"U64" => "u64".to_string(), "u64" => "u64".to_string(),
 };
 
 LState: usergen::Expression = {
