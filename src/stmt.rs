@@ -133,7 +133,7 @@ impl Code for Statement {
 	fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
 		-> Result<(),Error> {
 		match self {
-			&Statement::VariableDeclaration(ref nm, ref typ) => {
+			&Statement::VariableDeclaration(ref nm, _) => {
 				let sym = pgm.symlookup(nm).unwrap();
 				assert_eq!(sym.name, *nm);
 				write!(strm, "{};", sym.generator.decl(nm))
