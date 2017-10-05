@@ -42,6 +42,40 @@ impl Native {
 	}
 }
 
+pub trait RTTI {
+	fn type_name(&self) -> String;
+}
+impl RTTI for i8 { fn type_name(&self) -> String { "i8".to_string() } }
+impl RTTI for i16 { fn type_name(&self) -> String { "i16".to_string() } }
+impl RTTI for i32 { fn type_name(&self) -> String { "i32".to_string() } }
+impl RTTI for i64 { fn type_name(&self) -> String { "i64".to_string() } }
+impl RTTI for u8 { fn type_name(&self) -> String { "u8".to_string() } }
+impl RTTI for u16 { fn type_name(&self) -> String { "u16".to_string() } }
+impl RTTI for u32 { fn type_name(&self) -> String { "u32".to_string() } }
+impl RTTI for u64 { fn type_name(&self) -> String { "u64".to_string() } }
+impl RTTI for usize { fn type_name(&self) -> String { "usize".to_string() } }
+impl RTTI for f32 { fn type_name(&self) -> String { "f32".to_string() } }
+impl RTTI for f64 { fn type_name(&self) -> String { "f64".to_string() } }
+impl RTTI for bool { fn type_name(&self) -> String { "bool".to_string() } }
+impl RTTI for char { fn type_name(&self) -> String { "char".to_string() } }
+impl RTTI for Native {
+	fn type_name(&self) -> String {
+		match *self {
+			Native::U8 => "u8".to_string(), Native::U16 => "u16".to_string(),
+			Native::U32 => "u32".to_string(), Native::U64 => "u64".to_string(),
+			Native::I8 => "u8".to_string(), Native::I16 => "u16".to_string(),
+			Native::I32 => "u32".to_string(), Native::I64 => "u64".to_string(),
+			Native::Unsigned => "unsigned".to_string(),
+			Native::Usize => "usize".to_string(),
+			Native::Integer => "i32".to_string(),
+			Native::F32 => "f32".to_string(), Native::F64 => "f64".to_string(),
+			Native::Boolean => "bool".to_string(),
+			Native::Character => "char".to_string(),
+			Native::Void => "void".to_string(),
+		}
+	}
+}
+
 pub type EnumValue = (String, i64);
 pub type Field = (String, Box<Type>);
 
@@ -89,6 +123,28 @@ impl Type {
 		match self {
 			&Type::Pointer(ref inner) => inner.deref().clone(),
 			_ => panic!("Can't deref a non-pointer type!"),
+		}
+	}
+}
+
+impl RTTI for Type {
+	fn type_name(&self) -> String {
+		match self {
+			&Type::Builtin(ref nat) => nat.type_name(),
+			&Type::Pointer(ref base) => base.type_name() + "*",
+			&Type::Struct(ref nm, ref flds) => {
+				use std::fmt::Write;
+				let mut rv = String::new();
+				write!(&mut rv, "struct {} {{", nm).unwrap();
+				for f in flds {
+					//write!(&mut rv, "{}, ", (*f.1.deref()).type_name()).unwrap();
+					write!(&mut rv, "{}, ", f.1.type_name()).unwrap();
+				}
+				write!(&mut rv, "}}").unwrap();
+				rv
+			},
+			&Type::Enum(ref nm, _) => "enum ".to_string() + &nm,
+			&Type::Function(ref fqn) => "func ".to_string() + &fqn.name,
 		}
 	}
 }
