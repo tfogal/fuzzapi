@@ -115,11 +115,12 @@ impl<T: Clone + Default + Display> SingleGen<T> {
 	pub fn create() -> Self { SingleGen::<T>::default() }
 }
 
-impl<T: 'static + Clone + Default + ToString> Generator for SingleGen<T> {
+impl<T: 'static + Clone + Default + RTTI + ToString> Generator for
+SingleGen<T> {
 	fn name(&self) -> String {
 		// todo fixme: get the type 'T' somehow (RTTI?) as a string in the name.
 		let foo: T = Default::default();
-		"std:default".to_string() + &foo.to_string()
+		"std:single:".to_string() + &foo.type_name()
 	}
 	fn decl(&self, varname: &str) -> String {
 		let foo: T = Default::default();
