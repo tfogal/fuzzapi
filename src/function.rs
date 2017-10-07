@@ -21,11 +21,13 @@ impl Argument {
 }
 
 pub type ReturnType = Type;
+pub type Parameter = Type;
 
 #[derive(Clone, Debug)]
 pub struct Function {
 	pub retval: ReturnType,
 	pub arguments: Vec<Argument>,
+	pub parameters: Vec<Parameter>,
 	pub name: String,
 }
 impl Function {
@@ -34,6 +36,7 @@ impl Function {
 			name: nm.to_string(),
 			retval: rettype.clone(),
 			arguments: args.clone(),
+			parameters: args.iter().map(|a| a.expr.extype()).collect(),
 		}
 	}
 }
