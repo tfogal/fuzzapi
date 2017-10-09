@@ -6,6 +6,7 @@
 // much about semantics, and thereby importantly means we do less error
 // handling during parsing and more during subsequent semantic analysis.
 use std;
+use expr;
 use function;
 use stmt;
 use typ::{EnumValue, Native, Type};
@@ -248,22 +249,22 @@ impl Program {
 		}
 	}
 
-	// We have two types of expressions: "AST" expressions and stmt::Expressions.
+	// We have two types of expressions: "AST" expressions and expr::Expressions.
 	// The former are string based; the latter reference symbols from our
 	// self.symtab.  This converts from the AST variation to the analyzed version.
-	fn expr_to_expr(&self, expr: Expr) -> stmt::Expression {
+	fn expr_to_expr(&self, expr: Expr) -> expr::Expression {
 		match expr {
 			Expr::VarRef(ref sop, ref nm) => {
 				let v = self.symlookup(nm).unwrap();
-				stmt::Expression::Basic(*sop, v.clone())
+				expr::Expression::Basic(*sop, v.clone())
 			},
 			Expr::IConst(iger) => {
 				use std::str::FromStr;
-				stmt::Expression::IConstant(i64::from_str(&iger).unwrap())
+				expr::Expression::IConstant(i64::from_str(&iger).unwrap())
 			},
 			Expr::FConst(fp) => {
 				use std::str::FromStr;
-				stmt::Expression::FConstant(f64::from_str(&fp).unwrap())
+				expr::Expression::FConstant(f64::from_str(&fp).unwrap())
 			},
 			Expr::Call(ref nm, ref arglist) => {
 				let mut args: Vec<function::Argument> = Vec::new();
@@ -275,17 +276,17 @@ impl Program {
 				let symfunc = self.symlookup(nm).unwrap();
 				let rettype = symfunc.typ.clone();
 				let fqn = function::Function::new(&nm, &rettype, &args);
-				stmt::Expression::FqnCall(fqn)
+				expr::Expression::FqnCall(fqn)
 			},
 			Expr::Compound(ref l, ref bop, ref r) => {
 				use std::ops::Deref;
 				let lhs = self.expr_to_expr(l.deref().clone());
 				let rhs = self.expr_to_expr(r.deref().clone());
-				stmt::Expression::Compound(Box::new(lhs), bop.clone(), Box::new(rhs))
+				expr::Expression::Compound(Box::new(lhs), bop.clone(), Box::new(rhs))
 			},
 			Expr::Field(symname, fld) => {
 				let var = self.symlookup(&symname).unwrap();
-				stmt::Expression::Field(var.clone(), fld)
+				expr::Expression::Field(var.clone(), fld)
 			},
 		}
 	}

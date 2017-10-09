@@ -1,15 +1,15 @@
 use std;
 use std::io::Error;
 use api::*;
-use stmt;
+use expr;
 use typ::*;
 
 #[derive(Clone, Debug)]
 pub struct Argument {
-	pub expr: stmt::Expression,
+	pub expr: expr::Expression,
 }
 impl Argument {
-	pub fn new(expression: &stmt::Expression) -> Self {
+	pub fn new(expression: &expr::Expression) -> Self {
 		Argument{expr: expression.clone()}
 	}
 

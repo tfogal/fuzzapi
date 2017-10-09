@@ -1,6 +1,7 @@
 use std;
 use std::io::{Error};
 use api::*;
+use expr::Expression;
 use function::*;
 use typ::*;
 use opcode::{BinOp, UOp};
@@ -11,110 +12,9 @@ pub trait Code {
 		-> Result<(),std::io::Error>;
 }
 
-#[derive(Clone,Debug)]
-pub enum Expression {
-	Basic(UOp, Symbol),
-	IConstant(i64),
-	FConstant(f64),
-	Compound(Box<Expression>, BinOp, Box<Expression>),
-	// Since they return a value, we say function calls are expressions instead
-	// of statements.  Then any expression, no matter how trivial, is a
-	// Statement. This has the slightly undesirable property that "variable;" is
-	// a representable statement, which is nonsense, but I suppose it mirrors C
-	// so at least it's intuitive.
-	FqnCall(Function),
-	// Field expression is a field of a struct.
-	Field(Symbol, String),
-}
-
-impl Expression {
-	pub fn extype(&self) -> Type {
-		match self {
-			&Expression::Basic(ref op, ref src) => {
-				match *op {
-					UOp::AddressOf => Type::Pointer(Box::new(src.typ.clone())),
-					UOp::Deref => src.typ.dereference(),
-					UOp::Negate => {
-						println!("FIXME negate of unsigned type should be signed.");
-						src.typ.clone()
-					},
-					UOp::None => src.typ.clone(),
-					UOp::Not => src.typ.clone(),
-				}
-			},
-			&Expression::IConstant(_) => {
-				Type::Builtin(Native::I64)
-			},
-			&Expression::FConstant(_) => {
-				Type::Builtin(Native::F64)
-			},
-			&Expression::Compound(ref lhs, ref op, ref rhs) => {
-				let l = lhs.extype();
-				let r = rhs.extype();
-				op.result_type(l, r)
-			},
-			&Expression::FqnCall(ref fqn) => {
-				fqn.retval.clone()
-			},
-			&Expression::Field(ref sym, ref fld) => {
-				// "cast" to the Struct type from sym's type.
-				let fields = match sym.typ {
-					Type::Struct(_, ref flds) => flds,
-					_ =>
-						panic!("Field expr {} references {:?} type; must be a struct.",
-						       fld, sym.typ),
-				};
-				use typ;
-				let find_field_name = |f: &typ::Field| { f.0 == *fld };
-				let idx = match fields.iter().position(find_field_name) {
-					None => panic!("Struct '{:?}' has no field '{}'", sym.typ, fld),
-					Some(i) => i,
-				};
-				use std::ops::Deref;
-				fields[idx].1.deref().clone()
-			},
-		}
-	}
-}
-
 // A try that panic()s if it fails instead of returning an error.
 macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
-}
-
-impl Code for Expression {
-	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
-		-> Result<(),Error> {
-		match self {
-			&Expression::Basic(ref op, ref src) => {
-				write!(strm, "{}{}", op.to_string(), src.name)
-			},
-			&Expression::IConstant(integer) => {
-				write!(strm, "{}", integer)
-			},
-			&Expression::FConstant(fpval) => {
-				write!(strm, "{}", fpval)
-			},
-			&Expression::Compound(ref lhs, ref op, ref rhs) => {
-				try!(lhs.codegen(strm, program));
-				try!(write!(strm, " {} ", op.to_string()));
-				rhs.codegen(strm, program)
-			},
-			&Expression::FqnCall(ref fqn) => {
-				try!(write!(strm, "{}(", fqn.name));
-				for (a, arg) in fqn.arguments.iter().enumerate() {
-					try!(arg.codegen(strm, program));
-					if a != fqn.arguments.len()-1 {
-						try!(write!(strm, ", "));
-					}
-				}
-				write!(strm, ")")
-			},
-			&Expression::Field(ref sym, ref fld) => {
-				write!(strm, "{}.{}", sym.name, fld)
-			},
-		}
-	}
 }
 
 #[derive(Clone, Debug)]
@@ -194,7 +94,6 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use variable::*;
 	use variable;
 
 	macro_rules! cg_expect {
@@ -215,38 +114,6 @@ mod test {
 			                      genname: "".to_string(), ty: dt};
 			Stmt::Declaration(Declaration::Free(fvd))
 		})
-	}
-
-	#[test]
-	fn simple_expr() {
-		let mut pgm = Program::new(&vec![], &vec![
-			vardecl!("varname", Type::Builtin(Native::I32)),
-			vardecl!("var2", Type::Builtin(Native::I32)),
-			vardecl!("var3", Type::Pointer(Box::new(Type::Builtin(Native::I32)))),
-		]);
-		let g: Vec<Box<Generator>> = vec![Box::new(GenNothing{})];
-		pgm.set_generators(&g);
-		pgm.analyze().unwrap();
-
-		let null = UOp::None;
-		let varname = pgm.symlookup("varname").unwrap();
-		let expr = Expression::Basic(null, varname.clone());
-		assert_eq!(expr.extype(), Type::Builtin(Native::I32));
-		cg_expect!(expr, "varname", pgm);
-		drop(expr);
-
-		// make sure address of affects codegen.
-		let addrof = UOp::AddressOf;
-		let v2 = pgm.symlookup("var2").unwrap();
-		let expr = Expression::Basic(addrof, v2.clone());
-		cg_expect!(expr, "&var2", pgm);
-		drop(expr);
-
-		// make sure deref affects codegen.
-		let addrof = UOp::Deref;
-		let v3 = pgm.symlookup("var3").unwrap();
-		let expr = Expression::Basic(addrof, v3.clone());
-		cg_expect!(expr, "*var3", pgm);
 	}
 
 	macro_rules! compoundtest {

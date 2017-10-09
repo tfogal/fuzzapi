@@ -5,6 +5,7 @@ use std::path::Path;
 use std::process::Command;
 use tempdir::TempDir;
 mod api;
+mod expr;
 mod function;
 mod fuzz;
 mod generator;
@@ -30,7 +31,7 @@ fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
 		tryp!(write!(strm, "{}(", fqn.name));
 		for (a, arg) in fqn.arguments.iter().enumerate() {
 			match arg.expr {
-				stmt::Expression::Basic(_, ref sym) => {
+				expr::Expression::Basic(_, ref sym) => {
 					tryp!(write!(strm, "{:?}", sym.generator));
 				},
 				_ => (),
