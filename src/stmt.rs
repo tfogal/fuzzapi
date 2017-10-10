@@ -1,6 +1,6 @@
 use std;
 use std::io::{Error};
-use api::*;
+use api;
 use expr::Expression;
 use function::*;
 use typ::*;
@@ -8,7 +8,7 @@ use opcode::{BinOp, UOp};
 
 // Code is anything we can generate code for.
 pub trait Code {
-	fn codegen(&self, strm: &mut std::io::Write, program: &Program)
+	fn codegen(&self, strm: &mut std::io::Write, program: &api::Program)
 		-> Result<(),std::io::Error>;
 }
 
@@ -30,7 +30,7 @@ pub enum Statement {
 }
 
 impl Code for Statement {
-	fn codegen(&self, strm: &mut std::io::Write, pgm: &Program)
+	fn codegen(&self, strm: &mut std::io::Write, pgm: &api::Program)
 		-> Result<(),Error> {
 		match self {
 			&Statement::VariableDeclaration(ref nm, _) => {
@@ -109,10 +109,10 @@ mod test {
 
 	macro_rules! vardecl {
 		($vname:expr, $vtype:expr) => ({
-			let dt = DeclType::Basic($vtype);
-			let fvd = FreeVarDecl{name: $vname.to_string(),
-			                      genname: "".to_string(), ty: dt};
-			Stmt::Declaration(Declaration::Free(fvd))
+			let dt = api::DeclType::Basic($vtype);
+			let fvd = api::FreeVarDecl{name: $vname.to_string(),
+			                           genname: "".to_string(), ty: dt};
+			api::Stmt::Declaration(api::Declaration::Free(fvd))
 		})
 	}
 
@@ -125,7 +125,7 @@ mod test {
 	}
 	#[test]
 	fn compound_expr() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("LHS", Type::Builtin(Native::I32)),
 			vardecl!("RHS", Type::Builtin(Native::I32)),
 		]);
@@ -146,7 +146,7 @@ mod test {
 
 	#[test]
 	fn fqn_expr() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("rv", Type::Builtin(Native::I32)),
 			vardecl!("Fv", Type::Builtin(Native::I32)),
 			vardecl!("Va", Type::Builtin(Native::I32)),
@@ -181,7 +181,7 @@ mod test {
 
 	#[test]
 	fn expr_statement() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("a", Type::Builtin(Native::I32)),
 			vardecl!("b", Type::Builtin(Native::I32)),
 		]);
@@ -204,7 +204,7 @@ mod test {
 
 	#[test]
 	fn assignment_stmt() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("a", Type::Builtin(Native::I32)),
 			vardecl!("b", Type::Builtin(Native::I32)),
 		]);
@@ -220,7 +220,7 @@ mod test {
 
 	#[test]
 	fn verify_stmt() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("a", Type::Builtin(Native::I32)),
 		]);
 		pgm.analyze().unwrap();
@@ -233,7 +233,7 @@ mod test {
 
 	#[test]
 	fn constraint_stmt() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("a", Type::Builtin(Native::I32)),
 		]);
 		pgm.analyze().unwrap();
@@ -255,20 +255,20 @@ mod test {
 			("key".to_string(), Box::new(char_ptr.clone())),
 			("data".to_string(), Box::new(void_ptr.clone())),
 		]);
-		let foo = Symbol{name: "foo".to_string(),
-		                 generator: variable::generator(&entry), typ: entry};
+		let foo = api::Symbol{name: "foo".to_string(),
+		                      generator: variable::generator(&entry), typ: entry};
 		let keyexpr = Expression::Field(foo.clone(), "key".to_string());
 		let dataexpr = Expression::Field(foo, "data".to_string());
 		assert_eq!(keyexpr.extype(), char_ptr);
 		assert_eq!(dataexpr.extype(), void_ptr);
-		let pgm = Program::new(&vec![], &vec![]);
+		let pgm = api::Program::new(&vec![], &vec![]);
 		cg_expect!(keyexpr, "foo.key", pgm);
 		cg_expect!(dataexpr, "foo.data", pgm);
 	}
 
 	#[test]
 	fn if_statement() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("a", Type::Builtin(Native::I32)),
 		]);
 		pgm.analyze().unwrap();
@@ -281,7 +281,7 @@ mod test {
 
 	#[test]
 	fn while_statement() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("foo", Type::Builtin(Native::I32)),
 		]);
 		pgm.analyze().unwrap();

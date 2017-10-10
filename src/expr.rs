@@ -112,7 +112,6 @@ impl Code for Expression {
 mod test {
 	use super::*;
 	use variable::{Generator, GenNothing};
-	use api::{Declaration, DeclType, FreeVarDecl, Program, Stmt};
 
 	macro_rules! cg_expect {
 		($left:expr, $expected:expr, $pgm:expr) => (
@@ -127,16 +126,16 @@ mod test {
 
 	macro_rules! vardecl {
 		($vname:expr, $vtype:expr) => ({
-			let dt = DeclType::Basic($vtype);
-			let fvd = FreeVarDecl{name: $vname.to_string(),
-			                      genname: "".to_string(), ty: dt};
-			Stmt::Declaration(Declaration::Free(fvd))
+			let dt = api::DeclType::Basic($vtype);
+			let fvd = api::FreeVarDecl{name: $vname.to_string(),
+			                           genname: "".to_string(), ty: dt};
+			api::Stmt::Declaration(api::Declaration::Free(fvd))
 		})
 	}
 
 	#[test]
 	fn simple_expr() {
-		let mut pgm = Program::new(&vec![], &vec![
+		let mut pgm = api::Program::new(&vec![], &vec![
 			vardecl!("varname", Type::Builtin(Native::I32)),
 			vardecl!("var2", Type::Builtin(Native::I32)),
 			vardecl!("var3", Type::Pointer(Box::new(Type::Builtin(Native::I32)))),
