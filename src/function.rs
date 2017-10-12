@@ -4,6 +4,8 @@ use api::*;
 use expr;
 use typ::*;
 
+// What you really want here is parameters, not arguments.  A function call
+// expression could have arguments, but a function has parameters.
 #[derive(Clone, Debug)]
 pub struct Argument {
 	pub expr: expr::Expression,
