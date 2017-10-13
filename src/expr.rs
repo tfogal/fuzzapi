@@ -18,6 +18,7 @@ pub enum Expression {
 	// Statement. This has the slightly undesirable property that "variable;" is
 	// a representable statement, which is nonsense, but I suppose it mirrors C
 	// so at least it's intuitive.
+	// This needs to have a vector of expressions for the arguments.
 	FqnCall(Function),
 	// Field expression is a field of a struct.
 	Field(api::Symbol, String),
