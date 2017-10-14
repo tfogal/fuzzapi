@@ -240,7 +240,16 @@ impl Program {
 							let typ = type_from_decl(&fvd.ty, &self.typetab);
 							self.typetab.push(typ.clone());
 						},
-						Declaration::Function(_) => (), // right?
+						Declaration::Function(ref fdecl) => {
+							let rtype = type_from_decl(&fdecl.retval, &self.typetab);
+							let mut args: Vec<function::Parameter> = vec![];
+							for ag in fdecl.arguments.iter() {
+								let atype = type_from_decl(&ag, &self.typetab);
+								args.push(atype);
+							}
+							let func = function::Function::param(&fdecl.name, &rtype, &args);
+							self.typetab.push(Type::Function(Box::new(func.clone())));
+						},
 						Declaration::UDT(_) => (), // right?
 					}
 				},
