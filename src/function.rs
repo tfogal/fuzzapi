@@ -6,6 +6,8 @@ use typ::*;
 
 // What you really want here is parameters, not arguments.  A function call
 // expression could have arguments, but a function has parameters.
+pub type Parameter = Type;
+
 #[derive(Clone, Debug)]
 pub struct Argument {
 	pub expr: expr::Expression,
@@ -23,7 +25,6 @@ impl Argument {
 }
 
 pub type ReturnType = Type;
-pub type Parameter = Type;
 
 #[derive(Clone, Debug)]
 pub struct Function {
@@ -39,6 +40,14 @@ impl Function {
 			retval: rettype.clone(),
 			arguments: args.clone(),
 			parameters: args.iter().map(|a| a.expr.extype()).collect(),
+		}
+	}
+	pub fn param(nm: &str, rettype: &ReturnType, pm: &Vec<Parameter>) -> Self {
+		Function{
+			name: nm.to_string(),
+			retval: rettype.clone(),
+			arguments: vec![],
+			parameters: pm.clone(),
 		}
 	}
 }
