@@ -16,32 +16,11 @@ mod typ;
 mod util;
 mod usergen;
 mod variable;
-use function::*;
 use typ::*;
 use usergen::UserGen;
 
 macro_rules! tryp {
 	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
-}
-
-// This is mostly used for testing.
-#[allow(dead_code)]
-fn state(strm: &mut std::io::Write, fqns: &Vec<&Function>) {
-	for fqn in fqns {
-		tryp!(write!(strm, "{}(", fqn.name));
-		for (a, arg) in fqn.arguments.iter().enumerate() {
-			match arg.expr {
-				expr::Expression::Basic(_, ref sym) => {
-					tryp!(write!(strm, "{:?}", sym.generator));
-				},
-				_ => (),
-			};
-			if a != fqn.arguments.len()-1 {
-				tryp!(write!(strm, ", "));
-			}
-		}
-		tryp!(writeln!(strm, ")"));
-	}
 }
 
 fn system(cmd: &str) -> Result<(), String> {
