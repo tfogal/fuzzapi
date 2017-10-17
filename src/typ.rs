@@ -106,6 +106,7 @@ impl PartialEq for Type {
 				&Type::Enum(ref t, ref ovals) => s==t && vals==ovals,
 				_ => false,
 			},
+			// TODO: allow overloaded functions (match on args and/or rettype, too)?
 			&Type::Function(ref fqn) => match other {
 				&Type::Function(ref ofqn) => fqn.name == ofqn.name, _ => false,
 			},

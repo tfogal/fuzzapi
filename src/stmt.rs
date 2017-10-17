@@ -160,23 +160,25 @@ mod test {
 
 		let rtype = Type::Builtin(Native::I32);
 		let fqn = Function::new("f", &rtype, &vec![]);
-		let fexpr = Expression::FqnCall(fqn);
+		let fexpr = Expression::FqnCall(fqn, vec![]);
 
 		assert_eq!(fexpr.extype(), Type::Builtin(Native::I32));
 		cg_expect!(fexpr, "f()", pgm);
 		drop(fexpr);
 
 		// make sure it codegen's single argument...
-		let arg = Argument::new(&fvar);
-		let fqn = Expression::FqnCall(Function::new("g", &rtype, &vec![arg]));
-		cg_expect!(fqn, "g(Fv)", pgm);
-		drop(fqn);
+		let argtype = fvar.extype();
+		let fqn = Function::new("g", &rtype, &vec![argtype]);
+		let fexpr = Expression::FqnCall(fqn, vec![fvar]);
+		cg_expect!(fexpr, "g(Fv)", pgm);
+		drop(fexpr);
 
 		// .. and that it puts commas if there's an arglist...
-		let a0 = Argument::new(&va);
-		let a1 = Argument::new(&vb);
-		let fqn = Expression::FqnCall(Function::new("h", &rtype, &vec![a0, a1]));
-		cg_expect!(fqn, "h(Va, Vb)", pgm);
+		let a0 = va.extype();
+		let a1 = vb.extype();
+		let fqn = Function::new("h", &rtype, &vec![a0, a1]);
+		let fexpr = Expression::FqnCall(fqn, vec![va, vb]);
+		cg_expect!(fexpr, "h(Va, Vb)", pgm);
 	}
 
 	#[test]

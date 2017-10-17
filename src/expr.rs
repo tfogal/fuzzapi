@@ -18,8 +18,7 @@ pub enum Expression {
 	// Statement. This has the slightly undesirable property that "variable;" is
 	// a representable statement, which is nonsense, but I suppose it mirrors C
 	// so at least it's intuitive.
-	// This needs to have a vector of expressions for the arguments.
-	FqnCall(Function),
+	FqnCall(Function, Vec<Expression>),
 	// Field expression is a field of a struct.
 	Field(api::Symbol, String),
 }
@@ -50,7 +49,7 @@ impl Expression {
 				let r = rhs.extype();
 				op.result_type(l, r)
 			},
-			&Expression::FqnCall(ref fqn) => {
+			&Expression::FqnCall(ref fqn, _) => {
 				fqn.retval.clone()
 			},
 			&Expression::Field(ref sym, ref fld) => {
@@ -92,11 +91,12 @@ impl Code for Expression {
 				try!(write!(strm, " {} ", op.to_string()));
 				rhs.codegen(strm, program)
 			},
-			&Expression::FqnCall(ref fqn) => {
+			&Expression::FqnCall(ref fqn, ref args) => {
+				assert_eq!(fqn.parameters.len(), args.len());
 				try!(write!(strm, "{}(", fqn.name));
-				for (a, arg) in fqn.arguments.iter().enumerate() {
+				for (a, arg) in args.iter().enumerate() {
 					try!(arg.codegen(strm, program));
-					if a != fqn.arguments.len()-1 {
+					if a != fqn.parameters.len()-1 {
 						try!(write!(strm, ", "));
 					}
 				}

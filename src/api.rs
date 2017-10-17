@@ -40,7 +40,7 @@ pub struct FreeVarDecl {
 pub struct FuncDecl {
 	pub name: String,
 	pub retval: DeclType,
-	pub arguments: Vec<DeclType>,
+	pub parameters: Vec<DeclType>,
 }
 
 #[derive(Clone, Debug)]
@@ -144,6 +144,25 @@ impl Program {
 		None
 	}
 
+	// Lookup a function's type in the type table.
+	pub fn funlookup(&self, funcname: &str) -> Option<function::Function> {
+		use std::ops::Deref;
+		use function::Function;
+		// functions are currently matched based solely on name.
+		let fauxfunc = Box::new(
+			Function::new(funcname, &Type::Builtin(Native::Integer), &vec![])
+		);
+		for f in self.typetab.iter() {
+			if *f == Type::Function(fauxfunc.clone()) {
+				return match f {
+					&Type::Function(ref fqn) => Some(fqn.deref().clone()),
+					_ => unreachable!(), // name matches but it's not a fqn? popu. error.
+				};
+			}
+		}
+		return None;
+	}
+
 	fn genlookup(&self, ty: &Type, genname: &str) -> Option<Box<Generator>> {
 		#[allow(non_snake_case)]
 		let GENNAME = genname.to_string().to_uppercase();
@@ -225,7 +244,15 @@ impl Program {
 				},
 				Declaration::Constrained(_, _) => (),
 				Declaration::Free(_) => (),
-				Declaration::Function(_) => (),
+				Declaration::Function(ref fdecl) => {
+					let rtype = type_from_decl(&fdecl.retval, &self.typetab);
+					let params: Vec<Type> = fdecl.parameters.iter().map(
+						|pm| type_from_decl(&pm, &self.typetab)
+					).collect();
+					self.typetab.push(Type::Function(Box::new(
+						function::Function::new(&fdecl.name, &rtype, &params)
+					)));
+				},
 			};
 		}
 		for ref stmt in self.ast.iter() {
@@ -243,11 +270,11 @@ impl Program {
 						Declaration::Function(ref fdecl) => {
 							let rtype = type_from_decl(&fdecl.retval, &self.typetab);
 							let mut args: Vec<function::Parameter> = vec![];
-							for ag in fdecl.arguments.iter() {
+							for ag in fdecl.parameters.iter() {
 								let atype = type_from_decl(&ag, &self.typetab);
 								args.push(atype);
 							}
-							let func = function::Function::param(&fdecl.name, &rtype, &args);
+							let func = function::Function::new(&fdecl.name, &rtype, &args);
 							self.typetab.push(Type::Function(Box::new(func.clone())));
 						},
 						Declaration::UDT(_) => (), // right?
@@ -276,16 +303,18 @@ impl Program {
 				expr::Expression::FConstant(f64::from_str(&fp).unwrap())
 			},
 			Expr::Call(ref nm, ref arglist) => {
-				let mut args: Vec<function::Argument> = Vec::new();
+				let functype: function::Function = match self.funlookup(nm).clone() {
+					None => panic!("Function '{}' not defined.", nm),
+					Some(f) => f,
+				};
+				// Make sure the arity matches how the function is defined.
+				// TODO: should this be a regular error (not an assert?)
+				assert_eq!(functype.parameters.len(), arglist.len());
 				use std::ops::Deref;
-				for a in arglist.deref().iter() {
-					let ex = self.expr_to_expr(a.clone());
-					args.push(function::Argument::new(&ex));
-				}
-				let symfunc = self.symlookup(nm).unwrap();
-				let rettype = symfunc.typ.clone();
-				let fqn = function::Function::new(&nm, &rettype, &args);
-				expr::Expression::FqnCall(fqn)
+				let args: Vec<expr::Expression> = arglist.deref().iter().map(
+					|a| self.expr_to_expr(a.clone())
+				).collect();
+				expr::Expression::FqnCall(functype, args)
 			},
 			Expr::Compound(ref l, ref bop, ref r) => {
 				use std::ops::Deref;
@@ -729,17 +758,17 @@ mod test {
 			},
 			_ => panic!("retval should be a basic type, not {:?}", fqn.retval),
 		};
-		assert_eq!(fqn.arguments.len(), 2);
-		match fqn.arguments[0] {
+		assert_eq!(fqn.parameters.len(), 2);
+		match fqn.parameters[0] {
 			api::DeclType::Basic(ref ty) => match ty {
 				&Type::Builtin(ref t) => assert_eq!(*t, Native::Usize),
 				_ => panic!("basic type, but {:?} not usize", ty),
 			},
-			_ => panic!("arg0 should be a basic type, not {:?}", fqn.arguments[0]),
+			_ => panic!("arg0 should be a basic type, not {:?}", fqn.parameters[0]),
 		};
-		let ptr: &Type = match fqn.arguments[1] {
+		let ptr: &Type = match fqn.parameters[1] {
 			api::DeclType::Basic(ref ptr) => ptr,
-			_ => panic!("invalid arg1: {:?}", fqn.arguments[1]),
+			_ => panic!("invalid arg1: {:?}", fqn.parameters[1]),
 		};
 		let boxptr = match ptr {
 			&Type::Pointer(ref b) => b,
