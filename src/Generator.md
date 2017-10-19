@@ -22,34 +22,74 @@ approach is *likely* to find issues of those types if they exist.
 
 -----
 
-The idea is that there are a set of properties one can set in a graph.
-Let's say it's a computation tree for a simple calculator-like language.
-One "property" would be to print a single child node.  Another might be
-"add".  Another might be define-variable.  Another might be to add an
-integer constant node, where the actual integer constant itself comes from a
-generator.  And so on.
+Generators need to extend beyond more than just a single value.  Consider a
+graph or tree API that implements a computation tree for a simple
+calculator-like language:
 
-One can then think of HotFuzz as generating the test program:
-  graph* g = create_graph(); // the decl.
-  { g->add_child(g_print(null)); } // property 0, print.
-as well as the program:
-  graph* g = create_graph(); // the decl.
-  { g->add_child(g_add(nullptr, nullptr)) } // property 1, print.
-and so on for the other properties.  But it should also generate
-combinations.  Now omitting the decl:
-  { graph* ic = g_intconst(42); // property 4, integer constant node
-    g->add_child(g_print(ic)); } // property 0 mixed with property 4
-and:
-  { graph* ic = g_intconst(4billion); // property 4
-    graph* add = g_add(nullptr, ic); // property 2 mixed with property 4
-    g->add_child(g_print(add)); } // 1 mixed with 2 mixed with 4
-note that the last one could also be:
-  { graph* ic = g_intconst(4billion); // property 4
-    graph* add = g_add(nullptr, ic); // property 2 mixed with property 4
-    g->add_child(g_print(nullptr)); } // 1 mixed with 2 mixed with 4
-i.e. it sets up a bunch of things working in tandem but then decides NOT to
-use it.  This could still be a valid test, by verifying that there is no
-interaction between the "add" tree and the other tree.
+	typedef void graph;
+	graph* g_intconst(int);
+	graph* g_add(graph*, graph*);
+	void g_print(graph*, FILE*);
+	g_destroy(graph*);
+
+One might compute the expression "5 + 6 + 7" with the series of calls:
+
+	graph* five = g_intconst(5);
+	graph* six = g_intconst(6);
+	graph* seven = g_intconst(7);
+	graph* lhs = g_add(five, six);
+	graph* expr = g_add(lhs, seven);
+	g_print(expr, stdio);
+	g_destroy(expr);
+
+Verifying this is complex, as the combinations of possible nodes grows quickly
+with the set of APIs involved---this was just adding integers, imagine a range
+of math ops and a range of types.
+
+From HF's point of view, this is complex due to the fact that multiple
+generated states can interact.  If we consider a Generator that creates the
+line:
+
+	graph* five = g_intconst(5);
+
+then the issue is that we need to be able to test subsequent lines both in
+isolation *and* by taking into account the five we just created.  That is, we
+need to be able to generate both:
+
+	graph* foo = g_add(NULL, NULL);
+
+and
+
+	graph* foo = g_add(five, NULL);
+
+etc.  For practical testing one would want the arguments to 'g_add' to be any
+combination of NULL and any subgraph that warrant testing on its own.
+
+Thus we cannot assume that a Generator's current state generates a complete
+instance of a test: the state of a Generator includes the state of other
+Generators.  We support this by nesting Generators.
+
+This means Generators must be extended such that they can query the state of
+sub-generators at a finer granularity.  For example, if a sub-generator
+creates:
+	graph* six = g_intconst(6);
+then the Generator that houses it needs to be able to query the sub-generator
+and ask it for the list of variables it created---in this case: ["six"].  Then
+we can nest Generators ad infinitum.
+
+For example, one Generator might create graph*'s of all the different supported
+types.  Another might generate over all the supported math operations (add,
+subtract, multiply, etc.).  Another may generate nulls and intconsts.  Another
+generator may simply aggregate sub-generators and generate all combinations.
+
+Verification after this may be dependent on that full state.  Null pointers
+might be invalid in the tree; maybe your program simply asserts that any
+programs with null pointers as input succeed if the test executes without
+segfaulting.  But it could be more complex, such as wanting to assert that in
+the absence of subtract operations, and when a final print is present, the
+final print exceeds the value of any leaf node in the tree.  That kind of
+conditional will need to know how the tree was generated to know whether the
+assertion can be made.
 
 We might also consider various mixin verification stages.  For example,
 maybe the client wants to assert there are no memory leaks.  But maybe that
