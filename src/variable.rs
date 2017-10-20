@@ -715,8 +715,9 @@ pub struct FauxGraph {
 }
 impl Generator for FauxGraph {
 	fn name(&self) -> String { "gen:faux-graph".to_string() }
-	#[allow(unused_variables)]
 	fn decl(&self, varname: &str) -> String {
+		let mut rv = String::new();
+		write!(&mut rv, "graph_t* {} = graph_create()", varname).unwrap();
 		unreachable!();
 	}
 	fn value(&self) -> String {
