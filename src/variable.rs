@@ -713,6 +713,12 @@ impl Generator for GenIgnore {
 // a generator for a hypothetical graph API.
 pub struct FauxGraph {
 }
+impl FauxGraph {
+	// return the variables defined at the current value?
+	fn variables() -> Vec<String> {
+		vec!["foo".to_string(), "bar".to_string()]
+	}
+}
 impl Generator for FauxGraph {
 	fn name(&self) -> String { "gen:faux-graph".to_string() }
 	fn decl(&self, varname: &str) -> String {
