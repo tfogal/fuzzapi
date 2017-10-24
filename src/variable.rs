@@ -710,10 +710,30 @@ impl Generator for GenIgnore {
 	}
 }
 
+enum Variant {
+	Field(String, Vec<Box<Generator>>),
+	Method(String, Vec<Box<Generator>>),
+}
+
 // a generator for a hypothetical graph API.
 pub struct FauxGraph {
+	var: String,
+/*
+	variants: Vec<Variant>,
+*/
+	variants: Vec<String>,
+	idx: usize,
 }
 impl FauxGraph {
+	pub fn new(varname: String, vars: &Vec<String>) -> Self {
+/*
+		let vs = vars.iter().map(|v| v.clone()).collect();
+		FauxGraph{var: varname, variants: vs.iter().map(
+			|v| Variant::Field("foo", v)
+		).collect()}
+*/
+		FauxGraph{var: varname, variants: vars.clone(), idx: 0}
+	}
 	// return the variables defined at the current value?
 	fn variables() -> Vec<String> {
 		vec!["foo".to_string(), "bar".to_string()]
@@ -727,18 +747,24 @@ impl Generator for FauxGraph {
 		unreachable!();
 	}
 	fn value(&self) -> String {
-		"foo".to_string()
+		let mut rv = String::new();
+		write!(&mut rv, "{}({})", self.variants[self.idx], self.var).unwrap();
+		rv
 	}
-	fn next(&mut self) {}
-	fn done(&self) -> bool { true }
-	fn n_state(&self) -> usize { 1 }
-	fn reset(&mut self) {}
+	fn next(&mut self) {
+		self.idx = (self.idx + 1) % self.variants.len();
+	}
+	fn done(&self) -> bool { self.idx >= self.variants.len()-1 }
+	fn n_state(&self) -> usize { self.variants.len() }
+	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "FauxGraph{{...}}")
+		write!(f, "FauxGraph{{{}, {} of {}}}", self.var, self.idx,
+		       self.variants.len())
 	}
 	// Workaround because we can't clone() a trait, or a Box<> of one.
 	fn clone(&self) -> Box<Generator> {
-		Box::new(FauxGraph{})
+		Box::new(FauxGraph{var: self.var.clone(), variants: self.variants.clone(),
+		                   idx: self.idx})
 	}
 }
 
