@@ -742,6 +742,7 @@ impl FauxGraph {
 impl Generator for FauxGraph {
 	fn name(&self) -> String { "gen:faux-graph".to_string() }
 	fn decl(&self, varname: &str) -> String {
+		assert!(varname == self.var);
 		let mut rv = String::new();
 		write!(&mut rv, "graph_t* {} = graph_create()", varname).unwrap();
 		unreachable!();
