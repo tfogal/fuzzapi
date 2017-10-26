@@ -749,7 +749,18 @@ impl Generator for FauxGraph {
 	}
 	fn value(&self) -> String {
 		let mut rv = String::new();
-		write!(&mut rv, "{}({})", self.variants[self.idx], self.var).unwrap();
+		// because each variant is independent, and they can be enabled together,
+		// self.idx is more like a bitmask than a raw index.
+		for i in 0..64 { /// @todo fixme derive numbits in a usize somehow
+			let bit = 1u64 << i;
+			if bit as usize >= self.variants.len() {
+					break;
+			}
+			if (self.idx & bit as usize) > 0 {
+				write!(&mut rv, "{}({})", self.variants[bit as usize],
+				       self.var).unwrap();
+			}
+		}
 		rv
 	}
 	fn next(&mut self) {
