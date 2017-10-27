@@ -718,25 +718,12 @@ enum Variant {
 // a generator for a hypothetical graph API.
 pub struct FauxGraph {
 	var: String,
-/*
-	variants: Vec<Variant>,
-*/
 	variants: Vec<String>,
 	idx: usize,
 }
 impl FauxGraph {
 	pub fn new(varname: String, vars: &Vec<String>) -> Self {
-/*
-		let vs = vars.iter().map(|v| v.clone()).collect();
-		FauxGraph{var: varname, variants: vs.iter().map(
-			|v| Variant::Field("foo", v)
-		).collect()}
-*/
 		FauxGraph{var: varname, variants: vars.clone(), idx: 0}
-	}
-	// return the variables defined at the current value?
-	fn variables() -> Vec<String> {
-		vec!["foo".to_string(), "bar".to_string()]
 	}
 }
 impl Generator for FauxGraph {
