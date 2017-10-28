@@ -710,11 +710,6 @@ impl Generator for GenIgnore {
 	}
 }
 
-enum Variant {
-	Field(String, Vec<Box<Generator>>),
-	Method(String, Vec<Box<Generator>>),
-}
-
 // a generator for a hypothetical graph API.
 pub struct FauxGraph {
 	var: String,
