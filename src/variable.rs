@@ -730,17 +730,17 @@ impl Generator for FauxGraph {
 		unreachable!();
 	}
 	fn value(&self) -> String {
+		let numbits = ::std::mem::size_of::<usize>() * 8;
 		let mut rv = String::new();
 		// because each variant is independent, and they can be enabled together,
 		// self.idx is more like a bitmask than a raw index.
-		for i in 0..64 { /// @todo fixme derive numbits in a usize somehow
-			let bit = 1u64 << i;
-			if bit as usize >= self.variants.len() {
+		for i in 0..numbits {
+			let bit = 1usize << i;
+			if bit >= self.variants.len() {
 					break;
 			}
-			if (self.idx & bit as usize) > 0 {
-				write!(&mut rv, "{}({})", self.variants[bit as usize],
-				       self.var).unwrap();
+			if (self.idx & bit) > 0 {
+				write!(&mut rv, "{}({})", self.variants[bit], self.var).unwrap();
 			}
 		}
 		rv
