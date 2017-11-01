@@ -3,6 +3,7 @@
 //             Source utilized in
 //   Generator: holds the current/next state in the TypeClass list (tc.rs)
 use std::fmt::{Display, Write};
+use std::ops::Deref;
 extern crate rand;
 use rand::distributions::{IndependentSample, Range};
 use typ::*;
@@ -707,6 +708,22 @@ impl Generator for GenIgnore {
 	}
 	fn clone(&self) -> Box<Generator> {
 		Box::new(GenIgnore::new(self.subgen.clone(), self.ign, &self.name))
+	}
+}
+
+#[derive(Debug)]
+enum Variant {
+	Func(String, Vec<Box<Generator>>),
+}
+// Manually implement clone because of the Box'd trait.
+impl Clone for Variant {
+	fn clone(&self) -> Variant {
+		match *self {
+			Variant::Func(ref v, ref gens) => {
+				let gencopy = gens.iter().map(|gen| (*gen).clone()).collect();
+				Variant::Func(v.clone(), gencopy)
+			}
+		}
 	}
 }
 
