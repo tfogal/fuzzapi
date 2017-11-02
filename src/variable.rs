@@ -730,14 +730,39 @@ impl Clone for Variant {
 // a generator for a hypothetical graph API.
 pub struct FauxGraph {
 	var: String,
-	variants: Vec<String>,
+	variants: Vec<Variant>,
 	idx: usize,
 }
 impl FauxGraph {
 	pub fn new(varname: String, vars: &Vec<String>) -> Self {
-		FauxGraph{var: varname, variants: vars.clone(), idx: 0}
+		FauxGraph{
+			var: varname,
+			variants: vars.iter().map(
+				|v| Variant::Func(v.clone(), vec![])
+			).collect(),
+			idx: 0
+		}
 	}
 }
+
+// Let's say we have three variants with the prototypes:
+//   foo(nitz*, enum A),
+//   bar(nitz*, enum B),
+//   baz(nitz*, enum C)
+// Each call could be present or not, and there could be any number of
+// specific things passed for 'A', 'B', or 'C' that I'll refer to as e.g.
+// 'len(A)'.
+// The number of combinations is simple: 2^n (think of foo, bar, and baz
+// as bits that can be enabled or not).  But there are multiple variants
+// within each of those "bits": there are len(B) options if the bar()
+// function is "on".
+// Recognize that the choice of a possible value for enum B is independent
+// to any other choice.  That is, choosing 'B1' is independent of whether
+// we've chosen 'A0' or 'A1', and even independent of whether foo() will be
+// called or not.
+// A specific instance of such a generated program is a set of sets of
+// bitstrings.  We concatenate all the bitstrings for ease of reasoning, so we
+// just have a set of bits.
 impl Generator for FauxGraph {
 	fn name(&self) -> String { "gen:faux-graph".to_string() }
 	fn decl(&self, varname: &str) -> String {
@@ -746,27 +771,65 @@ impl Generator for FauxGraph {
 		write!(&mut rv, "graph_t* {} = graph_create()", varname).unwrap();
 		unreachable!();
 	}
+
 	fn value(&self) -> String {
+		// This is a multi-step process.  Earlier we said that each variant has its
+		// own bit string that gets concatenated together to form the value.  In
+		// practice, this value() only deals with the detail of whether each
+		// variant is on or off.  The detail of what specific value that variant
+		// will have is handled by calling value() on the sub-generator.
+
+		// self.idx is a bitmask that tells us which variants should be called.
+		// We run over every possible bit in a usize: if that bit is set, then we
+		// generate the code for that variant.
+		// Technically we could optimize by finding the high bit in self.idx and
+		// doing an early exit there, instead of running over ALL possible bits.
+		// Haven't measured, but hardly seems worth it.
 		let numbits = ::std::mem::size_of::<usize>() * 8;
 		let mut rv = String::new();
-		// because each variant is independent, and they can be enabled together,
-		// self.idx is more like a bitmask than a raw index.
 		for i in 0..numbits {
 			let bit = 1usize << i;
 			if bit >= self.variants.len() {
 					break;
 			}
 			if (self.idx & bit) > 0 {
-				write!(&mut rv, "{}({})", self.variants[bit], self.var).unwrap();
+				match self.variants[bit] {
+					Variant::Func(ref func, ref args) => {
+						write!(&mut rv, "{}({}", func, self.var).unwrap();
+						for arg in args.iter() {
+							write!(&mut rv, ", {}", arg.deref().value()).unwrap();
+						}
+						write!(&mut rv, ")").unwrap();
+					},
+				};
 			}
 		}
 		rv
 	}
 	fn next(&mut self) {
-		self.idx = (self.idx + 1) % self.variants.len();
+		self.idx = self.n_state().min(self.idx+1);
 	}
-	fn done(&self) -> bool { self.idx >= self.variants.len()-1 }
-	fn n_state(&self) -> usize { self.variants.len() }
+	fn done(&self) -> bool {
+		return self.idx >= self.n_state()
+	}
+
+	// The number of states in the FauxGraph test generator.
+	fn n_state(&self) -> usize {
+		// We first compute the number of bits in the concatenated bit strings.
+		// This is simply the sum of bits in all variants.
+		let n_per_subgen: Vec<usize> = self.variants.iter().map(|v|
+			match *v {
+				Variant::Func(_, ref args) =>
+					args.iter().fold(0, |accum, arg| accum + arg.deref().n_state()),
+			}
+		).collect();
+		let nbits: usize = n_per_subgen.iter().fold(0, |accum, ns| accum+ns);
+
+		// 2^nsubgen is the number of states we have.
+		let two: usize = 2;
+		return two.pow(nbits as u32);
+	}
+
 	fn reset(&mut self) { self.idx = 0; }
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "FauxGraph{{{}, {} of {}}}", self.var, self.idx,
