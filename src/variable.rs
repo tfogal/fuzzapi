@@ -714,6 +714,7 @@ impl Generator for GenIgnore {
 #[derive(Debug)]
 enum Variant {
 	Func(String, Vec<Box<Generator>>),
+	Field(String, Box<Generator>),
 }
 // Manually implement clone because of the Box'd trait.
 impl Clone for Variant {
@@ -722,7 +723,10 @@ impl Clone for Variant {
 			Variant::Func(ref v, ref gens) => {
 				let gencopy = gens.iter().map(|gen| (*gen).clone()).collect();
 				Variant::Func(v.clone(), gencopy)
-			}
+			},
+			Variant::Field(ref fld, ref gen) => {
+				Variant::Field(fld.clone(), gen.deref().clone())
+			},
 		}
 	}
 }
@@ -795,11 +799,15 @@ impl Generator for FauxGraph {
 			if (self.idx & bit) > 0 {
 				match self.variants[bit] {
 					Variant::Func(ref func, ref args) => {
-						write!(&mut rv, "{}({}", func, self.var).unwrap();
+						write!(&mut rv, "\t{}({}", func, self.var).unwrap();
 						for arg in args.iter() {
 							write!(&mut rv, ", {}", arg.deref().value()).unwrap();
 						}
-						write!(&mut rv, ")").unwrap();
+						write!(&mut rv, ");\n").unwrap();
+					},
+					Variant::Field(ref fld, ref rhs) => {
+						write!(&mut rv, "\t{}.{} = {};\n", self.var, fld,
+						       rhs.deref().value()).unwrap();
 					},
 				};
 			}
@@ -821,6 +829,7 @@ impl Generator for FauxGraph {
 			match *v {
 				Variant::Func(_, ref args) =>
 					args.iter().fold(0, |accum, arg| accum + arg.deref().n_state()),
+				Variant::Field(_, ref gen) => gen.n_state(),
 			}
 		).collect();
 		let nbits: usize = n_per_subgen.iter().fold(0, |accum, ns| accum+ns);
