@@ -831,9 +831,10 @@ impl Generator for FauxGraph {
 	}
 
 	fn reset(&mut self) { self.idx = 0; }
+
 	fn dbg(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "FauxGraph{{{}, {} of {}}}", self.var, self.idx,
-		       self.variants.len())
+		       self.n_state())
 	}
 	// Workaround because we can't clone() a trait, or a Box<> of one.
 	fn clone(&self) -> Box<Generator> {
