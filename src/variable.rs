@@ -773,7 +773,7 @@ impl Generator for FauxGraph {
 		assert!(varname == self.var);
 		let mut rv = String::new();
 		write!(&mut rv, "graph_t* {} = graph_create()", varname).unwrap();
-		unreachable!();
+		return rv;
 	}
 
 	fn value(&self) -> String {
@@ -899,5 +899,13 @@ mod test {
 		assert!(special_n.len() > 3);
 		assert!(mixed_n.len() > 3);
 		assert!(longstr.len() > 128);
+	}
+
+	#[test]
+	fn faux_graph_states() {
+		use variable::FauxGraph;
+		let methods = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
+		let fg = FauxGraph::new("grph".to_string(), &methods);
+		assert_eq!(fg.decl("grph"), "graph_t* grph = graph_create()");
 	}
 }
