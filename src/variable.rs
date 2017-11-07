@@ -833,6 +833,9 @@ impl Generator for FauxGraph {
 			}
 		).collect();
 		let nbits: usize = n_per_subgen.iter().fold(0, |accum, ns| accum+ns);
+		// Add in 1 bit per variant, to account for the case where the function is
+		// not called / the field is not set.
+		let nbits: usize = nbits + self.variants.len();
 
 		// 2^nsubgen is the number of states we have.
 		let two: usize = 2;
@@ -907,5 +910,7 @@ mod test {
 		let methods = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
 		let fg = FauxGraph::new("grph".to_string(), &methods);
 		assert_eq!(fg.decl("grph"), "graph_t* grph = graph_create()");
+		// 3 functions, each with 0 args ... so 2^3==8 states.
+		assert_eq!(fg.n_state(), 8);
 	}
 }
