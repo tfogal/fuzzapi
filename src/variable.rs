@@ -794,7 +794,7 @@ impl Generator for FauxGraph {
 		for i in 0..numbits {
 			let bit = 1usize << i;
 			if bit >= self.variants.len() {
-					break;
+				continue;
 			}
 			if (self.idx & bit) > 0 {
 				match self.variants[bit] {
