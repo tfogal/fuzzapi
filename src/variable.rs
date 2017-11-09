@@ -786,15 +786,19 @@ impl Generator for FauxGraph {
 		// self.idx is a bitmask that tells us which variants should be called.
 		// We run over every possible bit in a usize: if that bit is set, then we
 		// generate the code for that variant.
-		// Technically we could optimize by finding the high bit in self.idx and
-		// doing an early exit there, instead of running over ALL possible bits.
-		// Haven't measured, but hardly seems worth it.
 		let numbits = ::std::mem::size_of::<usize>() * 8;
+		// Small optimization: if we have 13u64 == 1101b variants, then 10000b ==
+		// 16u64 aka the next power of two is an upper bound on possible unique
+		// selections of variants.  We can use it as an early out, then.
+		let higher = match self.variants.len().checked_next_power_of_two() {
+			None => usize::max_value(),
+			Some(h) => h,
+		};
 		let mut rv = String::new();
 		for i in 0..numbits {
 			let bit = 1usize << i;
-			if bit >= self.variants.len() {
-				continue;
+			if bit >= higher {
+				break;
 			}
 			if (self.idx & bit) > 0 {
 				match self.variants[bit] {
