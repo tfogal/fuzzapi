@@ -12,11 +12,6 @@ pub trait Code {
 		-> Result<(),std::io::Error>;
 }
 
-// A try that panic()s if it fails instead of returning an error.
-macro_rules! tryp {
-	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
-}
-
 #[derive(Clone, Debug)]
 pub enum Statement {
 	VariableDeclaration(String /* name */, Type),
