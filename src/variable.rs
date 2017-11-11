@@ -712,7 +712,7 @@ impl Generator for GenIgnore {
 }
 
 #[derive(Debug)]
-enum Variant {
+pub enum Variant {
 	Func(String, Vec<Box<Generator>>),
 	Field(String, Box<Generator>),
 }
@@ -738,12 +738,10 @@ pub struct FauxGraph {
 	idx: usize,
 }
 impl FauxGraph {
-	pub fn new(varname: String, vars: &Vec<String>) -> Self {
+	pub fn new(varname: String, vars: &Vec<Variant>) -> Self {
 		FauxGraph{
 			var: varname,
-			variants: vars.iter().map(
-				|v| Variant::Func(v.clone(), vec![])
-			).collect(),
+			variants: vars.clone(),
 			idx: 0
 		}
 	}
@@ -910,8 +908,12 @@ mod test {
 
 	#[test]
 	fn faux_graph_states() {
-		use variable::FauxGraph;
-		let methods = vec!["foo".to_string(), "bar".to_string(), "baz".to_string()];
+		use variable::{FauxGraph, Variant};
+		let methods = vec![
+			Variant::Func("foo".to_string(), vec![]),
+			Variant::Func("bar".to_string(), vec![]),
+			Variant::Func("baz".to_string(), vec![])
+		];
 		let fg = FauxGraph::new("grph".to_string(), &methods);
 		assert_eq!(fg.decl("grph"), "graph_t* grph = graph_create()");
 		// 3 functions, each with 0 args ... so 2^3==8 states.
