@@ -908,15 +908,18 @@ mod test {
 
 	#[test]
 	fn faux_graph_states() {
-		use variable::{FauxGraph, Variant};
+		use variable::{natgenerator, FauxGraph, Variant};
 		let methods = vec![
 			Variant::Func("foo".to_string(), vec![]),
 			Variant::Func("bar".to_string(), vec![]),
-			Variant::Func("baz".to_string(), vec![])
+			Variant::Func("baz".to_string(), vec![]),
+			Variant::Field("foo2".to_string(), natgenerator(&Native::I32)),
 		];
 		let fg = FauxGraph::new("grph".to_string(), &methods);
 		assert_eq!(fg.decl("grph"), "graph_t* grph = graph_create()");
-		// 3 functions, each with 0 args ... so 2^3==8 states.
-		assert_eq!(fg.n_state(), 8);
+		// 3 functions with 0 args => 3 bits
+		// one field with 7 subgen states and one "enabled" bit => 8 bits
+		// == 11 bits => 2^11 == 2048
+		assert_eq!(fg.n_state(), 2048);
 	}
 }
