@@ -922,4 +922,17 @@ mod test {
 		// == 11 bits => 2^11 == 2048
 		assert_eq!(fg.n_state(), 2048);
 	}
+
+	#[test]
+	fn faux_graph_iter_terminates() {
+		use variable::{FauxGraph, Variant};
+		let methods = vec![
+			Variant::Func("foo".to_string(), vec![]),
+		];
+		let mut fg = FauxGraph::new("grph".to_string(), &methods);
+		while !fg.done() {
+			fg.next();
+		}
+		assert!(fg.done());
+	}
 }
