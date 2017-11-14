@@ -925,9 +925,9 @@ mod test {
 
 	#[test]
 	fn faux_graph_iter_terminates() {
-		use variable::{FauxGraph, Variant};
+		use variable::{natgenerator, FauxGraph, Variant};
 		let methods = vec![
-			Variant::Func("foo".to_string(), vec![]),
+			Variant::Func("foo".to_string(), vec![natgenerator(&Native::I32)]),
 		];
 		let mut fg = FauxGraph::new("grph".to_string(), &methods);
 		while !fg.done() {
