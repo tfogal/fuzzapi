@@ -19,10 +19,6 @@ mod variable;
 use typ::*;
 use usergen::UserGen;
 
-macro_rules! tryp {
-	($e:expr) => (match $e { Ok(f) => f, Err(g) => panic!("{}", g) })
-}
-
 fn system(cmd: &str) -> Result<(), String> {
 	use std::fmt;
 	use std::io::Read;
