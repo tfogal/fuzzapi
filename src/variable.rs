@@ -6,7 +6,7 @@ use std::fmt::{Display, Write};
 use std::ops::Deref;
 extern crate rand;
 use rand::distributions::{IndependentSample, Range};
-use function::Function;
+use expr::Expression;
 use typ::*;
 use tc::*;
 
@@ -737,10 +737,10 @@ pub struct FauxGraph {
 	var: String,
 	variants: Vec<Variant>,
 	idx: usize,
-	initializer: Function,
+	initializer: Expression,
 }
 impl FauxGraph {
-	pub fn new(varname: String, init: &Function, vars: &Vec<Variant>) -> Self {
+	pub fn new(varname: String, init: &Expression, vars: &Vec<Variant>) -> Self {
 		FauxGraph{
 			var: varname,
 			variants: vars.clone(),
@@ -773,10 +773,17 @@ impl Generator for FauxGraph {
 	fn decl(&self, varname: &str) -> String {
 		assert!(varname == self.var);
 		let mut rv = String::new();
-		// TODO FIXME: "initializer" really needs to be an expression, so
-		// that we can evaluate / put the right thing on the RHS.  Hack for now.
-		write!(&mut rv, "{} {} = {}()", self.initializer.retval.name(), varname,
-		       self.initializer.name).unwrap();
+		write!(&mut rv, "{} {}", self.initializer.extype().name(),
+		       varname).unwrap();
+
+		// HACK: We're going to need to take the program as an argument eventually.
+		// For now just create a fake one.
+		use api;
+		let foo: api::Program = api::Program::new(&vec![], &vec![]);
+		use stmt::Code;
+		let mut strm : Vec<u8> = Vec::new();
+		self.initializer.codegen(&mut strm, &foo).unwrap();
+		write!(&mut rv, " = {}", String::from_utf8(strm).unwrap()).unwrap();
 		return rv;
 	}
 
@@ -865,6 +872,7 @@ impl Generator for FauxGraph {
 
 #[cfg(test)]
 mod test {
+	use expr::Expression;
 	use function::Function;
 	use variable::{generator, Generator};
 	use typ::{Native, Type};
@@ -918,14 +926,15 @@ mod test {
 		use variable::{natgenerator, FauxGraph, Variant};
 		let gt = Type::Struct("graph_t".to_string(), vec![]);
 		let rvtype = Type::Pointer(Box::new(gt));
-		let init = Function::new("graph_create", &rvtype, &vec![]);
+		let initfunc = Function::new("graph_create", &rvtype, &vec![]);
+		let initexpr = Expression::FqnCall(initfunc, vec![]);
 		let methods = vec![
 			Variant::Func("foo".to_string(), vec![]),
 			Variant::Func("bar".to_string(), vec![]),
 			Variant::Func("baz".to_string(), vec![]),
 			Variant::Field("foo2".to_string(), natgenerator(&Native::I32)),
 		];
-		let fg = FauxGraph::new("grph".to_string(), &init, &methods);
+		let fg = FauxGraph::new("grph".to_string(), &initexpr, &methods);
 		assert_eq!(fg.decl("grph"), "struct graph_t* grph = graph_create()");
 		// 3 functions with 0 args => 3 bits
 		// one field with 7 subgen states and one "enabled" bit => 8 bits
@@ -938,11 +947,12 @@ mod test {
 		use variable::{natgenerator, FauxGraph, Variant};
 		let gt = Type::Struct("graph_t".to_string(), vec![]);
 		let rvtype = Type::Pointer(Box::new(gt));
-		let init = Function::new("graph_create", &rvtype, &vec![]);
+		let initfunc = Function::new("graph_create", &rvtype, &vec![]);
+		let initexpr = Expression::FqnCall(initfunc, vec![]);
 		let methods = vec![
 			Variant::Func("foo".to_string(), vec![natgenerator(&Native::I32)]),
 		];
-		let mut fg = FauxGraph::new("grph".to_string(), &init, &methods);
+		let mut fg = FauxGraph::new("grph".to_string(), &initexpr, &methods);
 		while !fg.done() {
 			fg.next();
 		}
