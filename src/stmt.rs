@@ -4,7 +4,7 @@ use api;
 use expr::Expression;
 use function::*;
 use typ::*;
-use opcode::{BinOp, UOp};
+use opcode::UOp;
 
 // Code is anything we can generate code for.
 pub trait Code {
@@ -89,6 +89,7 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use opcode::BinOp;
 	use variable;
 
 	macro_rules! cg_expect {

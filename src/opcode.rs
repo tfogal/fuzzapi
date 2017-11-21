@@ -128,7 +128,6 @@ impl fmt::Display for BinOp {
 
 mod test {
 	use super::*;
-	use typ::*;
 
 	#[test]
 	fn uop_result_type() {
