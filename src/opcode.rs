@@ -126,6 +126,7 @@ impl fmt::Display for BinOp {
 	}
 }
 
+#[cfg(test)]
 mod test {
 	use super::*;
 

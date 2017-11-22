@@ -2,7 +2,6 @@ use std;
 use std::io::{Error};
 use api;
 use expr::Expression;
-use function::*;
 use typ::*;
 use opcode::UOp;
 
@@ -89,6 +88,7 @@ impl Code for Statement {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use function::*;
 	use opcode::BinOp;
 	use variable;
 
