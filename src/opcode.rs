@@ -46,10 +46,7 @@ impl UOp {
 	pub fn result_type(&self, affects: Type) -> Type {
 		match *self {
 			UOp::AddressOf =>	Type::Pointer(Box::new(affects)),
-			UOp::Deref => match affects {
-				Type::Pointer(to) => *(to.clone()),
-				_ => unreachable!(),
-			},
+			UOp::Deref => affects.dereference(),
 			UOp::Negate => match affects {
 				Type::Builtin(nat) => Type::Builtin(self.nat_result_type(nat)),
 				_ => unimplemented!(),
