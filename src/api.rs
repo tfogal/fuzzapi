@@ -513,6 +513,7 @@ impl Program {
 	}
 
 	// Counts the number of states this program represents.
+	#[allow(dead_code)]
 	pub fn n_states(&self) -> usize {
 		return self.symtab.iter().fold(1, |n: usize, ref sym| {
 			return n*sym.generator.n_state();

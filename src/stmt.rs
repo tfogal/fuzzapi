@@ -3,7 +3,6 @@ use std::io::{Error};
 use api;
 use expr::Expression;
 use typ::*;
-use opcode::UOp;
 
 // Code is anything we can generate code for.
 pub trait Code {
@@ -89,7 +88,7 @@ impl Code for Statement {
 mod test {
 	use super::*;
 	use function::*;
-	use opcode::BinOp;
+	use opcode::{BinOp, UOp};
 	use variable;
 
 	macro_rules! cg_expect {
