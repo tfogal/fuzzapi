@@ -10,8 +10,9 @@ use typ::{Native, Type};
 #[derive(Clone,Debug)]
 pub enum Expression {
 	Basic(UOp, api::Symbol),
-	IConstant(i64),
 	FConstant(f64),
+	IConstant(i64),
+	UConstant(u64),
 	Compound(Box<Expression>, BinOp, Box<Expression>),
 	// Since they return a value, we say function calls are expressions instead
 	// of statements.  Then any expression, no matter how trivial, is a
@@ -38,12 +39,9 @@ impl Expression {
 					UOp::Not => src.typ.clone(),
 				}
 			},
-			&Expression::IConstant(_) => {
-				Type::Builtin(Native::I64)
-			},
-			&Expression::FConstant(_) => {
-				Type::Builtin(Native::F64)
-			},
+			&Expression::FConstant(_) => Type::Builtin(Native::F64),
+			&Expression::IConstant(_) => Type::Builtin(Native::I64),
+			&Expression::UConstant(_) => Type::Builtin(Native::U64),
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				let l = lhs.extype();
 				let r = rhs.extype();
@@ -80,11 +78,14 @@ impl Code for Expression {
 			&Expression::Basic(ref op, ref src) => {
 				write!(strm, "{}{}", op.to_string(), src.name)
 			},
+			&Expression::FConstant(fpval) => {
+				write!(strm, "{:.16}", fpval)
+			},
 			&Expression::IConstant(integer) => {
 				write!(strm, "{}", integer)
 			},
-			&Expression::FConstant(fpval) => {
-				write!(strm, "{}", fpval)
+			&Expression::UConstant(uinteger) => {
+				write!(strm, "{}", uinteger)
 			},
 			&Expression::Compound(ref lhs, ref op, ref rhs) => {
 				try!(lhs.codegen(strm, program));
