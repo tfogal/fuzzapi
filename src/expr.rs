@@ -166,4 +166,19 @@ mod test {
 		let expr = Expression::Basic(addrof, v3.clone());
 		cg_expect!(expr, "*var3", pgm);
 	}
+
+	#[test]
+	fn constexpr() {
+		let exprf = Expression::FConstant(1.0 as f64);
+		let expri = Expression::IConstant(1 as i64);
+		let expru = Expression::UConstant(1 as u64);
+		assert_eq!(exprf.extype(), Type::Builtin(Native::F64));
+		assert_eq!(expri.extype(), Type::Builtin(Native::I64));
+		assert_eq!(expru.extype(), Type::Builtin(Native::U64));
+		let mut pgm = api::Program::new(&vec![], &vec![]);
+		pgm.analyze().unwrap();
+		cg_expect!(exprf, "1.0000000000000000", pgm);
+		cg_expect!(expri, "1", pgm);
+		cg_expect!(expru, "1", pgm);
+	}
 }
