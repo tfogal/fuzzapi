@@ -5,6 +5,7 @@ use std::path::Path;
 use std::process::Command;
 use tempdir::TempDir;
 mod api;
+mod ast;
 mod expr;
 mod function;
 mod fuzz;

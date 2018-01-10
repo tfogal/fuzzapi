@@ -1,5 +1,6 @@
 // Parsing grammar/code for the user's program abstraction.
 use api;
+use ast;
 use typ::{Native, Type};
 use opcode;
 
@@ -9,6 +10,15 @@ pub LProgram : api::Program = {
 	<decls: LDeclarations> <stmts: LStmt*> => {
 		api::Program::new(&decls, &stmts)
 	},
+};
+
+LInclude: ast::Include = {
+  "#include" "\"" <inc: LIdentifier> "\"" => {
+    ast::Include::Local(inc)
+  },
+  "#include" "<" <inc: LIdentifier> ">" => {
+    ast::Include::System(inc)
+  },
 };
 
 pub LDeclarations : Vec<api::Declaration> = {
