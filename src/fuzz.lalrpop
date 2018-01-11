@@ -13,12 +13,12 @@ pub LProgram : api::Program = {
 };
 
 LInclude: ast::Include = {
-  "#include" "\"" <inc: LIdentifier> "\"" => {
-    ast::Include::Local(inc)
-  },
-  "#include" "<" <inc: LIdentifier> ">" => {
-    ast::Include::System(inc)
-  },
+	"#include" "\"" <inc: LIdentifier> "\"" => {
+		ast::Include::Local(inc)
+	},
+	"#include" "<" <inc: LIdentifier> ">" => {
+		ast::Include::System(inc)
+	},
 };
 
 pub LDeclarations : Vec<api::Declaration> = {
