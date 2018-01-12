@@ -92,7 +92,26 @@ LConstant: ::typ::EnumValue = {
 			Ok(x) => x,
 		};
 		(nm, v)
-	}
+	},
+	<nm: LIdentifier> "," => {
+		(nm, 0)
+	},
+};
+
+LTypeDef: ast::Typedef = {
+	"typedef" <src: LTypeRef> <to: LIdentifier> => {
+		use typ::RTTI;
+		match src {
+			api::DeclType::Basic(t) => ast::Typedef{from: t.type_name(), to: to},
+			api::DeclType::Struct(strct, _) => ast::Typedef{from: strct, to},
+			api::DeclType::Enum(enm, _) => ast::Typedef{from: enm, to},
+			api::DeclType::StructRef(strct) => ast::Typedef{from: strct, to},
+			api::DeclType::EnumRef(enm) => ast::Typedef{from: enm, to},
+		}
+	},
+	"typedef" <from: LIdentifier> <to: LIdentifier> => {
+		ast::Typedef{from, to}
+	},
 };
 
 LVarDecl: api::Declaration = {
