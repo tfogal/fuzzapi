@@ -10,6 +10,7 @@ mod expr;
 mod function;
 mod fuzz;
 mod generator;
+mod lexer;
 mod opcode;
 mod stmt;
 mod tc;
